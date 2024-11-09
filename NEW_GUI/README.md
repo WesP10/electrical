@@ -55,12 +55,11 @@ The Sensor Dashboard Application allows users to monitor real-time data from mul
 
 ## Installation
 
-1. **Clone the Repository**
+1. **Change into NEW_GUI Directory**
 
-   ```bash
-   git clone https://github.com/yourusername/sensor-dashboard.git
-   cd sensor-dashboard
-   ```
+```bash
+cd NEW_GUI
+```
 
 2. **Create a Virtual Environment (Optional but Recommended)**
 
@@ -144,7 +143,7 @@ sensor-dashboard/
 
 ### Running the Application
 
-To start the application, navigate to the project directory and run:
+To start the application, navigate to the project directory (`cd NEW_GUI`) and run:
 
 ```bash
 python app.py
