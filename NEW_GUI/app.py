@@ -3,8 +3,8 @@ import dash
 import dash_bootstrap_components as dbc
 from sensors import load_sensors
 from sensors.communication import PySerialCommunication  # or ZCMCommunication
-from tabs import register_tabs  # Import the register_tabs function
-import callbacks  # Import the callbacks module
+from layout import create_layout  # Import the layout function
+import callbacks  # Import the general callbacks module
 
 # Initialize the Dash app
 app = dash.Dash(
@@ -23,12 +23,11 @@ communication = PySerialCommunication(
 
 # Load sensors with shared communication
 sensors = load_sensors(communication)
-sensor_dict = {sensor.name: sensor for sensor in sensors}
 
-# Register tabs and get the app layout
-app.layout = register_tabs(app, sensors)
+# Assign the main layout of the app
+app.layout = create_layout(app, sensors)
 
-# Register overall project callbacks
+# Register general callbacks (Emergency button, etc.)
 callbacks.register_callbacks(app, sensors)
 
 if __name__ == '__main__':

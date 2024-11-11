@@ -1,20 +1,27 @@
 # layout.py
-import dash_bootstrap_components as dbc
 from dash import html, dcc
-from tabs import get_tab_modules  # Function to get tab modules dynamically
+import dash_bootstrap_components as dbc
+from tabs import register_tabs  # Import register_tabs to dynamically load tabs
 
-def create_layout(sensors):
-    # Get the list of tab modules
-    tab_modules = get_tab_modules()
-    
-    # Create tabs dynamically
-    tabs = []
-    for tab_module in tab_modules:
-        tab = dcc.Tab(label=tab_module.tab_label, value=tab_module.tab_id)
-        tabs.append(tab)
-    
+def create_layout(app, sensors):
+    """
+    Define the main layout of the application, including the Navbar, Emergency button, and tabs.
+
+    Parameters:
+    - app: The Dash app instance.
+    - sensors: List of sensor objects for the sensor dashboard.
+
+    Returns:
+    - A Dash layout component for the main app layout.
+    """
+    # Register tabs and get a list of dcc.Tab components
+    tabs = register_tabs(app, sensors)
+
+    # Ensure we have a default tab if any tabs are available
+    default_tab = tabs[0].value if tabs else None
+
+    # Define the main app layout with the Navbar and tab container
     layout = dbc.Container([
-        # Wrap the entire content in a Card for better aesthetics
         dbc.Card([
             dbc.Navbar(
                 dbc.Container([
@@ -26,9 +33,10 @@ def create_layout(sensors):
                 className="mb-4"
             ),
             dbc.Container([
-                dcc.Tabs(id='tabs', value=tab_modules[0].tab_id, children=tabs),
+                dcc.Tabs(id='tabs', value=default_tab, children=tabs),
                 html.Div(id='tabs-content')
             ], fluid=True),
         ], body=True, className="mt-3"),
     ], fluid=True)
+
     return layout

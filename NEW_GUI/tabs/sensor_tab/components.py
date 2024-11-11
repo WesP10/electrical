@@ -1,51 +1,40 @@
 # tabs/sensor_tab/components.py
+import importlib
 from dash import html, dcc
 import dash_bootstrap_components as dbc
+from .sensor_cards.base_sensor_card import BaseSensorCard
 
-def create_sensor_card(sensor_name, sensor):
-    # Interval adjustment control
-    interval_control = html.Div([
-        html.Label('Update Interval (seconds):'),
-        dcc.Input(
-            id={'type': 'interval-control', 'sensor_name': sensor_name},
-            type='number',
-            min=1,
-            value=5,  # Default interval
-            step=1
-        ),
-    ], className='mb-2')
+def create_sensor_card(app, sensor_name, sensor):
+    """
+    Create a sensor card, dynamically loading sensor-specific classes if available.
 
-    # Time window control
-    time_window_control = html.Div([
-        html.Label('Time Window (seconds):'),
-        dcc.Input(
-            id={'type': 'time-window', 'sensor_name': sensor_name},
-            type='number',
-            min=0,
-            placeholder='All data',
-            step=1
-        ),
-    ], className='mb-2')
+    Parameters:
+    - app: The Dash app instance.
+    - sensor_name: The name of the sensor.
+    - sensor: The sensor object containing data and metadata.
 
-    # Sensor-specific Interval component
-    sensor_interval = dcc.Interval(
-        id={'type': 'sensor-interval', 'sensor_name': sensor_name},
-        interval=5 * 1000,  # Default interval in milliseconds
-        n_intervals=0
-    )
+    Returns:
+    - A Dash Bootstrap Card component representing the sensor.
+    """
+    # Normalize sensor name to create a valid module/class name
+    class_name = sensor_name.replace(' ', '').replace('-', '').replace('_', '')
+    module_name = f'tabs.sensor_tab.sensor_cards.{class_name.lower()}_card'
+    class_name = f'{class_name}Card'
 
-    # Placeholder for dynamic content (current values and graphs)
-    sensor_content = html.Div(
-        id={'type': 'sensor-content', 'sensor_name': sensor_name}
-    )
+    try:
+        # Dynamically import the module
+        module = importlib.import_module(module_name)
+        # Get the class from the module
+        card_class = getattr(module, class_name)
+    except (ImportError, AttributeError):
+        # Fallback to the base class if not found
+        card_class = BaseSensorCard
 
-    card = dbc.Card([
-        dbc.CardHeader(html.H5(sensor_name)),
-        dbc.CardBody([
-            interval_control,
-            time_window_control,
-            sensor_content,
-            sensor_interval  # Include the Interval component
-        ])
-    ], className='mb-4')
-    return card
+    # Instantiate the card class, passing the app instance
+    sensor_card = card_class(app, sensor_name, sensor)
+
+    # Register sensor-specific callbacks if applicable
+    if hasattr(sensor_card, 'register_callbacks'):
+        sensor_card.register_callbacks()
+
+    return sensor_card.create_card()

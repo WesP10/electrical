@@ -3,25 +3,29 @@ from dash import html, dcc
 import dash_bootstrap_components as dbc
 
 def get_layout(sensors):
-    sensor_names = [sensor.name for sensor in sensors]
+    """
+    Define the layout for the Sensor Tab.
 
-    layout = html.Div([
+    Parameters:
+    - sensors: List of sensor objects.
+
+    Returns:
+    - Dash layout for the Sensor Tab.
+    """
+    return dbc.Container([
         dbc.Row([
             dbc.Col([
-                html.Label('Select Sensors to Display'),
+                html.Label('Select Sensors:'),
                 dcc.Dropdown(
                     id='sensor-dropdown',
-                    options=[{'label': name, 'value': name} for name in sensor_names],
-                    value=sensor_names,  # Default to all sensors selected
+                    options=[{'label': sensor.name, 'value': sensor.name} for sensor in sensors],
                     multi=True,
-                    clearable=False
-                ),
-            ], width=12),
-        ]),
-        html.Br(),
+                    value=[sensor.name for sensor in sensors]  # Default to all sensors
+                )
+            ], width=12, md=6)
+        ], className='mb-4'),
         dbc.Row(
             id='sensor-cards',
-            # Children will be generated in the callback
+            children=[]  # Sensor cards will be dynamically inserted here
         )
-    ])
-    return layout
+    ], fluid=True)
