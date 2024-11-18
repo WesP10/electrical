@@ -1,496 +1,237 @@
-# **Sensors Module README**
+# Sensors Module - README
 
-Welcome to the **Sensors Module** of the **Sensor Dashboard Application**! This module is responsible for managing sensor interactions, including communication, data retrieval, and sensor initialization. It provides a structured way to integrate various sensors into the application, ensuring scalability and maintainability.
+This document provides an overview of the `sensors` module within the `sensor_dashboard` project. It explains how the sensor system is structured, how to add new sensors, and the expected data format for serial communication to ensure seamless integration with the GUI.
 
 ---
 
-## **Table of Contents**
+## Table of Contents
 
 - [Overview](#overview)
 - [Module Structure](#module-structure)
-- [Communication Classes](#communication-classes)
-  - [PySerial Communication](#pyserial-communication)
-    - [Installation](#installation)
-    - [Usage](#usage)
-    - [Configuring Serial Communication](#configuring-serial-communication)
-    - [Example: Reading Data from Arduino](#example-reading-data-from-arduino)
-  - [Arduino Data Format](#arduino-data-format)
-    - [Expected Data Format](#expected-data-format)
-    - [Sample Arduino Code](#sample-arduino-code)
-- [Creating a New Sensor](#creating-a-new-sensor)
-  - [1. Create Sensor Class](#1-create-sensor-class)
-  - [2. Update `load_sensors` Function](#2-update-load_sensors-function)
-- [Sensor Class Guidelines](#sensor-class-guidelines)
-- [Example: Temperature Sensor](#example-temperature-sensor)
-- [Best Practices](#best-practices)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
-- [License](#license)
+- [Communication Interface](#communication-interface)
+  - [PySerialCommunication](#pyserialcommunication)
+  - [ZCMCommunication](#zcmcommunication)
+- [Adding New Sensors](#adding-new-sensors)
+  - [Step 1: Create a New Sensor File](#step-1-create-a-new-sensor-file)
+  - [Step 2: Define the Sensor Class](#step-2-define-the-sensor-class)
+  - [Step 3: Implement Data Callback (Optional)](#step-3-implement-data-callback-optional)
+- [Serial Data Format](#serial-data-format)
+  - [Message Structure](#message-structure)
+  - [Examples](#examples)
+- [Example: Adding a Temperature Sensor](#example-adding-a-temperature-sensor)
+- [Closing the Sensor](#closing-the-sensor)
+- [Additional Notes](#additional-notes)
 
 ---
 
-## **Overview**
+## Overview
 
-The **Sensors Module** is designed to:
-
-- **Facilitate Sensor Integration**: Provide a standardized way to add new sensors.
-- **Manage Communication**: Handle communication protocols (e.g., serial communication with Arduino).
-- **Support Data Retrieval**: Define methods for fetching sensor data.
-- **Promote Modularity**: Allow sensors to be added or removed without affecting other parts of the application.
+The `sensors` module is designed to manage the integration of various sensors into the Plotly Dash GUI. It handles sensor data acquisition, parsing, and communication between the hardware interface and the GUI components.
 
 ---
 
-## **Module Structure**
+## Module Structure
 
-```
-sensor_dashboard/
-├── sensors/
-    ├── __init__.py
-    ├── communication.py
-    ├── load_sensors.py
-    ├── base_sensor.py
-    ├── temperature_sensor.py
-    ├── accelerometer_sensor.py
-    └── ... (other sensor classes)
-```
+The `sensors` directory contains the following files:
 
-- **`communication.py`**: Defines communication classes used by sensors.
-- **`load_sensors.py`**: Contains the `load_sensors` function to initialize all sensors.
-- **`base_sensor.py`**: Provides a base class for sensors to inherit common functionality.
-- **`<sensor_name>_sensor.py`**: Individual sensor classes implementing specific sensor logic.
+- `__init__.py`: Initializes the module and dynamically loads sensor classes.
+- `base_sensor.py`: Defines the `BaseSensor` class, which serves as the blueprint for all sensor implementations.
+- `communication.py`: Contains communication interfaces (`PySerialCommunication` and `ZCMCommunication`) for interacting with sensors.
+- `extra_sensor.py`: Placeholder for additional sensor implementations.
+- `load_sensors.py`: Handles the loading of sensor classes (if applicable).
 
 ---
 
-## **Communication Classes**
+## Communication Interface
 
-The module includes communication classes to abstract the details of how sensors communicate with the application.
+### PySerialCommunication
 
-### **PySerial Communication**
+This class handles serial communication with sensors connected via serial ports (e.g., USB ports connected to microcontrollers like Arduino).
 
-**PySerial** is a Python library that encapsulates the access for the serial port. It provides backends for Python running on Windows, Linux, and other platforms.
+**Key Features:**
 
-#### **Installation**
+- **Auto-Reconnection**: Attempts to reconnect if the connection is lost.
+- **Threaded Reading**: Continuously reads data in a separate thread to prevent blocking the main application.
+- **Callback Mechanism**: Uses callbacks to process incoming data for registered sensor IDs.
 
-To use PySerial, you need to install it using pip:
+**Initialization Parameters:**
 
-```bash
-pip install pyserial
-```
+- `port`: Serial port name (e.g., `COM3`, `/dev/ttyUSB0`).
+- `baudrate`: Communication speed (default is `9600`).
+- `timeout`: Read timeout in seconds (default is `1`).
+- `reconnect_interval`: Time in seconds between reconnection attempts (default is `5`).
 
-#### **Usage**
+### ZCMCommunication
 
-**File**: `sensors/communication.py`
+This class manages communication using the ZeroCM (ZCM) library, suitable for networked environments.
 
-```python
-import serial
+**Key Features:**
 
-class PySerialCommunication:
-    def __init__(self, port, baudrate=9600, timeout=1):
-        """
-        Initialize serial communication.
+- **Subscription-Based**: Subscribes to specific channels to receive sensor data.
+- **Callback Mechanism**: Processes incoming messages through registered callbacks.
+- **Threaded Operation**: Runs the ZCM event loop in a separate thread.
 
-        Parameters:
-        - port (str): Serial port name (e.g., '/dev/ttyUSB0' on Linux or 'COM3' on Windows).
-        - baudrate (int): Communication speed.
-        - timeout (float): Read timeout in seconds.
-        """
-        self.port = port
-        self.baudrate = baudrate
-        self.timeout = timeout
-        try:
-            self.serial_connection = serial.Serial(port=self.port, baudrate=self.baudrate, timeout=self.timeout)
-            print(f"Connected to serial port {self.port}")
-        except serial.SerialException as e:
-            print(f"Error connecting to serial port {self.port}: {e}")
-            self.serial_connection = None
+**Initialization Parameters:**
 
-    def read_line(self):
-        """
-        Read a line from the serial port.
+- `url`: The ZCM URL for network communication.
+- `channels`: A list of channels to subscribe to for receiving sensor data.
 
-        Returns:
-        - str: Decoded line from the serial port.
-        """
-        if self.serial_connection and self.serial_connection.in_waiting:
-            line = self.serial_connection.readline()
-            return line.decode('utf-8').strip()
-        return None
+---
 
-    def write(self, data):
-        """
-        Write data to the serial port.
+## Adding New Sensors
 
-        Parameters:
-        - data (str): Data to send.
-        """
-        if self.serial_connection:
-            self.serial_connection.write(data.encode('utf-8'))
-```
+To integrate a new sensor into the system, follow these steps:
 
-#### **Configuring Serial Communication**
+### Step 1: Create a New Sensor File
 
-When initializing `PySerialCommunication`, you need to provide the correct serial port and parameters.
+In the `sensors` directory, create a new Python file named `<sensor_name>_sensor.py`. For example, for a temperature sensor, you might name it `temperature_sensor.py`.
 
-**Example Initialization in `app.py`:**
+### Step 2: Define the Sensor Class
+
+In your new sensor file, define a class named `Sensor` that inherits from `BaseSensor`.
 
 ```python
-# app.py
-from sensors.communication import PySerialCommunication
-
-# Initialize shared communication using dependency injection
-communication = PySerialCommunication(
-    port='/dev/ttyUSB0',  # Replace with your serial port (e.g., 'COM3' on Windows)
-    baudrate=9600,        # Ensure this matches the Arduino's baud rate
-    timeout=1
-)
-```
-
-**Determining the Serial Port:**
-
-- **Linux/Mac**: Serial ports are usually named `/dev/ttyUSB0`, `/dev/ttyACM0`, etc.
-- **Windows**: Serial ports are named `COM1`, `COM2`, etc.
-
-#### **Example: Reading Data from Arduino**
-
-In your sensor class, you can use the `read_line` method to get data from the Arduino.
-
-```python
-# sensors/your_sensor.py
-
 from .base_sensor import BaseSensor
-from datetime import datetime
 
-class YourSensor(BaseSensor):
+class Sensor(BaseSensor):
     def __init__(self, communication):
-        super().__init__(communication)
-        self.name = "Your Sensor Name"
-        self.data_fields = ['Temperature', 'Humidity']
-
-    def get_data(self):
-        line = self.communication.read_line()
-        if line:
-            # Parse the line into data
-            data = self.parse_data(line)
-            if data:
-                data['Time'] = datetime.now()
-                return data
-        return None
-
-    def parse_data(self, line):
-        # Implement parsing logic based on the expected data format
-        pass
+        super().__init__(
+            name='Temperature Sensor',
+            communication=communication,
+            sensor_id='TEMP_SENSOR',
+            data_fields=['temperature']
+        )
 ```
 
----
+**Parameters:**
 
-## **Arduino Data Format**
+- `name`: A human-readable name for the sensor.
+- `communication`: An instance of the communication interface (e.g., `PySerialCommunication`).
+- `sensor_id`: A unique identifier string used to distinguish data from this sensor.
+- `data_fields`: A list of field names corresponding to the data values sent by the sensor.
 
-To ensure proper communication between the Arduino and the application, the data sent from the Arduino must be in a format that the Python application can parse.
+### Step 3: Implement Data Callback (Optional)
 
-### **Expected Data Format**
-
-The data format should be:
-
-- **Consistent**: Each line sent over serial should follow the same structure.
-- **Parsable**: Use a format that's easy to parse in Python (e.g., CSV, JSON).
-
-**Common Formats:**
-
-1. **Comma-Separated Values (CSV):**
-
-   ```
-   value1,value2,value3
-   ```
-
-2. **JSON String:**
-
-   ```
-   {"Temperature":25.0,"Humidity":40.0}
-   ```
-
-3. **Key-Value Pairs:**
-
-   ```
-   Temperature=25.0;Humidity=40.0
-   ```
-
-### **Sample Arduino Code**
-
-Below is an example Arduino sketch that sends sensor data in CSV format over serial.
-
-**Example:**
-
-```cpp
-// Arduino Sketch
-
-void setup() {
-  Serial.begin(9600); // Set the baud rate to match PySerialCommunication
-}
-
-void loop() {
-  // Read sensor values
-  float temperature = readTemperatureSensor();
-  float humidity = readHumiditySensor();
-
-  // Send data over serial in CSV format
-  Serial.print(temperature);
-  Serial.print(",");
-  Serial.println(humidity);
-
-  delay(1000); // Send data every second
-}
-
-float readTemperatureSensor() {
-  // Replace with actual sensor reading code
-  return 25.0;
-}
-
-float readHumiditySensor() {
-  // Replace with actual sensor reading code
-  return 40.0;
-}
-```
-
-**Notes:**
-
-- The Arduino sends data in the format: `25.0,40.0`
-- Each data line is terminated with a newline character `\n`, which `readline()` in PySerial uses to read the complete line.
-
----
-
-## **Creating a New Sensor**
-
-To add a new sensor to the application, follow these steps:
-
-### **1. Create Sensor Class**
-
-Create a new sensor class in the `sensors/` directory, following the naming convention `<sensor_name>_sensor.py`.
-
-**Example**: `sensors/your_sensor.py`
+If your sensor requires custom data processing, you can override the `data_callback` method.
 
 ```python
-# sensors/your_sensor.py
-
-from .base_sensor import BaseSensor
-from datetime import datetime
-
-class YourSensor(BaseSensor):
-    def __init__(self, communication):
-        super().__init__(communication)
-        self.name = "Your Sensor Name"
-        self.data_fields = ['Temperature', 'Humidity']
-
-    def get_data(self):
-        line = self.communication.read_line()
-        if line:
-            data = self.parse_data(line)
-            if data:
-                data['Time'] = datetime.now()
-                return data
-        return None
-
-    def parse_data(self, line):
-        try:
-            # Assuming CSV format: Temperature,Humidity
-            values = line.split(',')
-            if len(values) == 2:
-                temperature = float(values[0])
-                humidity = float(values[1])
-                return {
-                    'Temperature': temperature,
-                    'Humidity': humidity
-                }
-        except ValueError as e:
-            print(f"Error parsing line '{line}': {e}")
-        return None
+def data_callback(self, values):
+    # Custom data processing logic
+    pass
 ```
 
-### **2. Update `load_sensors` Function**
+---
 
-Add your new sensor class to the list of sensors in `load_sensors.py`.
+## Serial Data Format
+
+To ensure that the GUI correctly parses the incoming data, sensor data must be sent in a specific format over the serial port.
+
+### Message Structure
+
+```
+<sensor_id>:<data_values>
+```
+
+- `<sensor_id>`: The unique identifier for the sensor (e.g., `TEMP_SENSOR`).
+- `<data_values>`: Comma-separated list of data values (e.g., `23.5`, `0.1,0.2,0.3`).
+
+**Important Notes:**
+
+- **No Extra Spaces**: Do not include spaces in the message.
+- **Newline Termination**: Each message should end with a newline character (`\n`).
+
+### Examples
+
+- **Temperature Sensor:**
+
+  ```
+  TEMP_SENSOR:23.5
+  ```
+
+- **Accelerometer Sensor:**
+
+  ```
+  ACCEL_SENSOR:0.1,0.2,0.3
+  ```
+
+---
+
+## Example: Adding a Temperature Sensor
+
+1. **Create the Sensor File:**
+
+   Create a file named `temperature_sensor.py` in the `sensors` directory.
+
+2. **Define the Sensor Class:**
+
+   ```python
+   from .base_sensor import BaseSensor
+
+   class Sensor(BaseSensor):
+       def __init__(self, communication):
+           super().__init__(
+               name='Temperature Sensor',
+               communication=communication,
+               sensor_id='TEMP_SENSOR',
+               data_fields=['temperature']
+           )
+   ```
+
+3. **Send Data from the Sensor Hardware:**
+
+   Ensure your sensor hardware sends data in the correct format. For example, from an Arduino:
+
+   ```cpp
+   Serial.println("TEMP_SENSOR:23.5");
+   ```
+
+   Replace `23.5` with the actual temperature reading.
+
+4. **Data Reception in the GUI:**
+
+   The `PySerialCommunication` class will read this data, and the `BaseSensor`'s `data_callback` method will parse and store it.
+
+---
+
+## Closing the Sensor
+
+When a sensor is no longer needed or the application is shutting down, ensure you properly close the sensor to deregister callbacks and release resources.
 
 ```python
-# sensors/load_sensors.py
-
-from .your_sensor import YourSensor
-
-def load_sensors(communication):
-    sensors = [
-        YourSensor(communication),
-        # ... other sensors
-    ]
-    return sensors
+sensor.close()
 ```
 
 ---
 
-## **Sensor Class Guidelines**
+## Additional Notes
 
-When creating a sensor class, adhere to the following guidelines:
+- **Dynamic Sensor Loading:**
 
-- **Inherit from `BaseSensor`**: This ensures consistency and allows you to leverage common functionality.
-- **Define `self.name`**: A unique name for the sensor.
-- **Define `self.data_fields`**: A list of data fields the sensor provides (excluding 'Time').
-- **Implement `get_data` Method**:
+  The `sensors/__init__.py` file automatically loads all sensor classes named `Sensor` from files ending with `_sensor.py`. This means you do not need to manually import or register new sensors once you've added the new sensor file and class.
 
-  - Should return a dictionary containing the sensor data.
-  - Must include a 'Time' field with a timestamp.
-  - Keys should match `self.data_fields`.
+- **Data Handling:**
 
-- **Implement `parse_data` Method**:
+  - The `BaseSensor` class stores incoming data in `self.data`, which is a list of dictionaries.
+  - Use the `get_data()` method to retrieve a Pandas DataFrame of the collected data.
+  - Optionally, you can clear the stored data after retrieval by uncommenting `self.data.clear()` in the `get_data()` method.
 
-  - Parse the line read from the serial port into a dictionary.
+- **Error Handling:**
 
-- **Handle Exceptions**: Ensure that any communication errors are handled gracefully.
+  - The system includes basic error handling to manage invalid data and communication errors.
+  - Ensure your sensor hardware sends data in the correct format to prevent parsing errors.
 
-**Example**:
+- **Thread Safety:**
 
-```python
-# sensors/base_sensor.py
+  - The communication classes use threading and locks to ensure thread safety during read/write operations.
+  - Avoid making blocking calls or long-running processes in the `data_callback` method to prevent slowing down the data acquisition thread.
 
-class BaseSensor:
-    def __init__(self, communication):
-        self.communication = communication
+- **Dependencies:**
 
-    def get_data(self):
-        raise NotImplementedError("get_data method must be implemented by subclasses.")
-```
+  - The `PySerialCommunication` class requires the `pyserial` library.
+  - The `ZCMCommunication` class requires the `zcm` library.
 
 ---
 
-## **Example: Temperature Sensor**
+By following this guide, you can seamlessly integrate new sensors into the `sensor_dashboard` project, ensuring that data is correctly captured and displayed in the GUI.
 
-Here's how the Temperature Sensor is implemented, using PySerial communication and parsing data from the Arduino.
-
-**Arduino Sketch (Sending Data):**
-
-```cpp
-// Arduino Sketch for Temperature Sensor
-
-void setup() {
-  Serial.begin(9600);
-}
-
-void loop() {
-  float temperature = readTemperatureSensor();
-  Serial.println(temperature); // Send temperature value
-  delay(1000);
-}
-
-float readTemperatureSensor() {
-  // Replace with actual sensor reading code
-  return 25.0;
-}
-```
-
-**Python Sensor Class:**
-
-```python
-# sensors/temperature_sensor.py
-
-from .base_sensor import BaseSensor
-from datetime import datetime
-
-class TemperatureSensor(BaseSensor):
-    def __init__(self, communication):
-        super().__init__(communication)
-        self.name = "Temperature Sensor"
-        self.data_fields = ['Temperature']
-
-    def get_data(self):
-        line = self.communication.read_line()
-        if line:
-            data = self.parse_data(line)
-            if data:
-                data['Time'] = datetime.now()
-                return data
-        return None
-
-    def parse_data(self, line):
-        try:
-            temperature = float(line)
-            return {'Temperature': temperature}
-        except ValueError as e:
-            print(f"Error parsing temperature '{line}': {e}")
-            return None
-```
-
----
-
-## **Best Practices**
-
-- **Match Baud Rates**: Ensure that the baud rate set in the Arduino sketch (`Serial.begin(baudrate)`) matches the baud rate specified in `PySerialCommunication`.
-- **Consistent Data Format**: Keep the data format consistent and simple to parse.
-- **Data Validation**: Validate data in the `parse_data` method to handle any anomalies.
-- **Logging**: Print informative messages when errors occur to facilitate debugging.
-- **Resource Management**: Close serial connections properly when the application exits.
-
----
-
-## **Troubleshooting**
-
-### **No Data Received from Arduino**
-
-- **Check Serial Port**: Verify the correct serial port is used.
-- **Baud Rate Mismatch**: Ensure baud rates match between Arduino and PySerial.
-- **Arduino Not Sending Data**: Confirm that the Arduino is powered and running the correct sketch.
-- **Permissions**: On Unix systems, you may need to add your user to the `dialout` group or run the application with elevated permissions.
-
-### **Data Parsing Errors**
-
-- **Incorrect Data Format**: Ensure the data sent from the Arduino matches the expected format in the `parse_data` method.
-- **Error Messages**: Review any error messages printed during parsing to identify issues.
-
-### **Serial Connection Errors**
-
-- **Port Already in Use**: Close other programs that might be using the serial port (e.g., Arduino IDE Serial Monitor).
-- **SerialException**: Check for exceptions when initializing `PySerialCommunication`.
-
----
-
-## **Contributing**
-
-Contributions to the Sensors Module are welcome! Please ensure that any additions adhere to the project's modular design principles.
-
-### **Steps to Contribute**
-
-1. **Fork the Repository**
-
-   ```bash
-   git clone https://github.com/yourusername/sensor_dashboard.git
-   ```
-
-2. **Create a Feature Branch**
-
-   ```bash
-   git checkout -b feature/your-feature
-   ```
-
-3. **Make Changes and Commit**
-
-   ```bash
-   git add .
-   git commit -m "Add your feature"
-   ```
-
-4. **Push to Your Fork and Submit a Pull Request**
-
-   ```bash
-   git push origin feature/your-feature
-   ```
-
----
-
-## **License**
-
-This project is licensed under the MIT License.
-
----
-
-Thank you for using and contributing to the **Sensor Dashboard Application**! If you have any questions or need further assistance with the Sensors Module, please feel free to reach out.
-
----
-
-**Note**: When adding new sensors, consider whether you also need to create a corresponding **Data Handler** in `tabs/sensor_tab/data_handlers/` to process and format the sensor data for display. This ensures consistency in how data is presented in the dashboard.
-
----
+For any further assistance or questions, please refer to the main `README.md` in the project root or contact the development team.

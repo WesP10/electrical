@@ -1,8 +1,9 @@
 # tabs/sensor_tab/layout.py
 from dash import html, dcc
 import dash_bootstrap_components as dbc
+from .components import create_all_sensor_cards
 
-def get_layout(sensors):
+def get_layout(sensors, app):
     """
     Define the layout for the Sensor Tab.
 
@@ -12,6 +13,7 @@ def get_layout(sensors):
     Returns:
     - Dash layout for the Sensor Tab.
     """
+    sensor_cards = create_all_sensor_cards(app, sensors)
     return dbc.Container([
         dbc.Row([
             dbc.Col([
@@ -26,6 +28,6 @@ def get_layout(sensors):
         ], className='mb-4'),
         dbc.Row(
             id='sensor-cards',
-            children=[]  # Sensor cards will be dynamically inserted here
+            children=sensor_cards  # Sensor cards will be dynamically inserted here
         )
     ], fluid=True)

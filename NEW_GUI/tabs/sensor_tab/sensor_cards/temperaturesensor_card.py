@@ -3,7 +3,7 @@ from .base_sensor_card import BaseSensorCard
 from ..data_handlers.base_data_handler import BaseSensorDataHandler
 from dash import html, dcc
 import dash_bootstrap_components as dbc
-from dash.dependencies import Input, Output, State, MATCH
+from dash.dependencies import Input, Output, State
 import plotly.graph_objects as go
 import pandas as pd
 from datetime import datetime, timedelta
@@ -58,14 +58,18 @@ class TemperatureSensorCard(BaseSensorCard):
         """
         Register sensor-specific callbacks for the Temperature Sensor.
         """
+        if BaseSensorCard.callbacks_registered.get(self.sensor_name, False):
+            BaseSensorCard.callbacks_registered[self.sensor_name] = True
+            return
+        self.callbacks_registered = True
         @self.app.callback(
-            Output({'type': 'sensor-content', 'sensor_name': MATCH}, 'children'),
+            Output({'type': 'sensor-content', 'sensor_name': self.sensor_name}, 'children'),
             [
-                Input({'type': 'sensor-interval', 'sensor_name': MATCH}, 'n_intervals'),
-                Input({'type': 'time-window', 'sensor_name': MATCH}, 'value'),
-                Input({'type': 'temp-unit', 'sensor_name': MATCH}, 'value')
+                Input({'type': 'sensor-interval', 'sensor_name': self.sensor_name}, 'n_intervals'),
+                Input({'type': 'time-window', 'sensor_name': self.sensor_name}, 'value'),
+                Input({'type': 'temp-unit', 'sensor_name': self.sensor_name}, 'value')
             ],
-            [State({'type': 'sensor-content', 'sensor_name': MATCH}, 'id')]
+            [State({'type': 'sensor-content', 'sensor_name': self.sensor_name}, 'id')]
         )
         def update_temperature_sensor_content(n_intervals, time_window_value, temp_unit, content_id):
             """

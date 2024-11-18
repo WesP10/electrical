@@ -1,7 +1,7 @@
 # layout.py
 from dash import html, dcc
 import dash_bootstrap_components as dbc
-from tabs import register_tabs  # Import register_tabs to dynamically load tabs
+from tabs import register_tabs, get_tab_modules  # Import register_tabs to dynamically load tabs
 
 def create_layout(app, sensors):
     """
@@ -17,9 +17,13 @@ def create_layout(app, sensors):
     # Register tabs and get a list of dcc.Tab components
     tabs = register_tabs(app, sensors)
 
+    tab_modules = get_tab_modules()
+    
     # Ensure we have a default tab if any tabs are available
     default_tab = tabs[0].value if tabs else None
-
+    
+    default_tab_content = tab_modules[0].get_layout(sensors, app) if tab_modules else html.Div('No tabs found')
+    
     # Define the main app layout with the Navbar and tab container
     layout = dbc.Container([
         dbc.Card([
@@ -34,7 +38,7 @@ def create_layout(app, sensors):
             ),
             dbc.Container([
                 dcc.Tabs(id='tabs', value=default_tab, children=tabs),
-                html.Div(id='tabs-content')
+                html.Div(id='tabs-content', children=default_tab_content)
             ], fluid=True),
         ], body=True, className="mt-3"),
     ], fluid=True)

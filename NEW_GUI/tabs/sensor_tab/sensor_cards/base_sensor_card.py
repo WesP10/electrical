@@ -1,9 +1,11 @@
 # tabs/sensor_tab/sensor_cards/base_sensor_card.py
-from dash import html, dcc
+from dash import html, dcc, Output, Input, State
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
+from datetime import datetime, timedelta
 
 class BaseSensorCard:
+    callbacks_registered = {}
     def __init__(self, app, sensor_name, sensor):
         """
         Initialize the base sensor card.
@@ -125,12 +127,68 @@ class BaseSensorCard:
         card = dbc.Card([
             dbc.CardHeader(html.H5(self.sensor_name)),
             dbc.CardBody(card_body)
-        ], className='mb-4')
+        ], 
+        className='mb-4',
+        id={'type': 'sensor-card', 'sensor_name': self.sensor_name})
         return card
 
     def register_callbacks(self):
-        """
-        Placeholder for registering sensor-specific callbacks.
-        Subclasses can override this method to add their own callbacks.
-        """
-        pass
+        # Check if callbacks have already been registered for this sensor
+        if BaseSensorCard.callbacks_registered.get(self.sensor_name, False):
+            BaseSensorCard.callbacks_registered[self.sensor_name] = True
+            return
+        # if self.app.layout[0].data['callbacks_registered'].get(self.sensor_name, False):
+        #     self.app.layout[0].data['callbacks_registered'][self.sensor_name] = True
+        #     self.app.layout[0].data
+        #     return
+        # self.callbacks_registered = True
+        # print(self.app.layout[0].data)
+        # print(f"Callback registered for {self.sensor_name}")
+        # Callback to update the sensor graphs
+        @self.app.callback(
+            [Output({'type': 'sensor-graph', 'sensor_name': self.sensor_name, 'field': field}, 'figure') for field in self.data_fields],
+            Input({'type': 'sensor-interval', 'sensor_name': self.sensor_name}, 'n_intervals'),
+            State({'type': 'time-window', 'sensor_name': self.sensor_name}, 'value')
+        )
+        def update_sensor_graphs(n_intervals, time_window):
+            data = self.sensor.get_data()
+            # print(data)
+            figures = []
+            if data.empty:
+                # Return empty figures
+                for field in self.data_fields:
+                    figures.append(go.Figure(
+                        layout = {
+                            "title":f"{self.sensor_name} - {field.capitalize()}",
+                            "xaxis_title":"Time",
+                            "yaxis_title":f"{field.capitalize()} Value"
+                        }
+                    ))
+            else:
+                # Filter data based on time_window
+                if time_window is not None and time_window > 0:
+                    cutoff_time = datetime.now() - timedelta(seconds=time_window)
+                    data = data[data['Time'] >= cutoff_time]
+                for field in self.data_fields:
+                    figure = go.Figure(data=[
+                        go.Scatter(x=data['Time'], y=data[field], mode='lines', name=field)
+                    ])
+                    figure.update_layout(
+                        title=f"{self.sensor_name} - {field.capitalize()}",
+                        xaxis_title="Time",
+                        yaxis_title=f"{field.capitalize()} Value"
+                    )
+                    figures.append(figure)
+            return figures
+
+        # Callback to update the interval component's interval property
+        @self.app.callback(
+            Output({'type': 'sensor-interval', 'sensor_name': self.sensor_name}, 'interval'),
+            Input({'type': 'interval-control', 'sensor_name': self.sensor_name}, 'value')
+        )
+        def update_interval(value):
+            if value is None or value < 1:
+                return 5 * 1000  # Default interval in milliseconds
+            else:
+                return int(value * 1000)  # Convert seconds to milliseconds
+

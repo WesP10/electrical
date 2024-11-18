@@ -1,5 +1,8 @@
+# sensors/communication.py
 import threading
+import time
 from abc import ABC, abstractmethod
+import serial
 
 class CommunicationInterface(ABC):
     def __init__(self):
@@ -15,29 +18,80 @@ class CommunicationInterface(ABC):
     def close(self):
         pass
 
-# PySerial Communication Implementation
 class PySerialCommunication(CommunicationInterface):
-    def __init__(self, port, baudrate=9600, timeout=1):
+    def __init__(self, port, baudrate=9600, timeout=1, reconnect_interval=5):
         super().__init__()
-        import serial
-        try:
-            self.serial_conn = serial.Serial(port=port, baudrate=baudrate, timeout=timeout)
-            self.running = True
-            self.thread = threading.Thread(target=self.read_loop)
-            self.thread.daemon = True
-            self.thread.start()
-        except serial.SerialException as e:
-            print(f"Error initializing serial connection: {e}")
-            self.serial_conn = None
+        self.port = port
+        self.baudrate = baudrate
+        self.timeout = timeout
+        self.reconnect_interval = reconnect_interval
+        self.serial_conn = None
+        self.running = True
+        self.serial_lock = threading.Lock()
+        self.thread = threading.Thread(target=self.read_loop, name="SerialReadThread")
+        self.thread.daemon = True
+        self.thread.start()
+
+    def connect(self):
+        while self.running:
+            try:
+                print(f"Attempting to connect to serial port {self.port}")
+                self.serial_conn = serial.Serial(
+                    port=self.port,
+                    baudrate=self.baudrate,
+                    timeout=self.timeout
+                )
+                time.sleep(2)  # Wait for Arduino to reset if necessary
+                print(f"Connected to serial port {self.port}")
+                break  # Exit the loop once connected
+            except serial.SerialException as e:
+                print(f"Error connecting to serial port {self.port}: {e}")
+                print(f"Retrying in {self.reconnect_interval} seconds...")
+                time.sleep(self.reconnect_interval)
+            except Exception as e:
+                print(f"Unexpected error: {e}")
+                print(f"Retrying in {self.reconnect_interval} seconds...")
+                time.sleep(self.reconnect_interval)
 
     def read_loop(self):
-        while self.running and self.serial_conn and self.serial_conn.is_open:
-            line = self.serial_conn.readline().decode('utf-8').strip()
-            if line:
-                sensor_id, data_str = self.parse_message(line)
-                if sensor_id and sensor_id in self.callbacks:
-                    data_values = data_str.split(',')
-                    self.callbacks[sensor_id](data_values)
+        self.connect()
+        while self.running:
+            if self.serial_conn and self.serial_conn.is_open:
+                # print("Serial connection is open.")
+                try:
+                    with self.serial_lock:
+                        line = self.serial_conn.readline().decode('utf-8').strip()
+                    if line:
+                        # print(f"Received line: {line}")
+                        sensor_id, data_str = self.parse_message(line)
+                        if sensor_id and sensor_id in self.callbacks:
+                            data_values = data_str.split(',')
+                            self.callbacks[sensor_id](data_values)
+                except serial.SerialException as e:
+                    print(f"SerialException occurred: {e}")
+                    print("Closing connection and attempting to reconnect...")
+                    with self.serial_lock:
+                        try:
+                            self.serial_conn.close()
+                        except Exception as close_exception:
+                            print(f"Error closing serial connection: {close_exception}")
+                        self.serial_conn = None
+                    self.connect()
+                except Exception as e:
+                    print(f"Unexpected error during read: {e}")
+                    # Close the serial connection and attempt to reconnect
+                    with self.serial_lock:
+                        if self.serial_conn:
+                            try:
+                                self.serial_conn.close()
+                            except Exception as close_exception:
+                                print(f"Error closing serial connection: {close_exception}")
+                            self.serial_conn = None
+                    self.connect()
+            else:
+                print("Serial connection is not open. Attempting to reconnect...")
+                self.connect()
+            time.sleep(0.1)  # Small delay to prevent a tight loop
 
     def parse_message(self, message):
         parts = message.split(':', 1)
@@ -49,7 +103,12 @@ class PySerialCommunication(CommunicationInterface):
     def close(self):
         self.running = False
         if self.serial_conn and self.serial_conn.is_open:
-            self.serial_conn.close()
+            try:
+                self.serial_conn.close()
+                print("Serial connection closed.")
+            except Exception as e:
+                print(f"Error closing serial connection: {e}")
+
 
 # ZCM Communication Implementation
 class ZCMCommunication(CommunicationInterface):

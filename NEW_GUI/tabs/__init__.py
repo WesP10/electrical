@@ -24,12 +24,12 @@ def register_tabs(app, sensors):
         # Add a tab component for each discovered module
         tabs.append(dcc.Tab(label=module.tab_label, value=module.tab_id))
         
-        # Register each module's specific callbacks if they have them
-        if hasattr(module, 'register_callbacks'):
-            module.register_callbacks(app, sensors)
+        # # Register each module's specific callbacks if they have them
+        # if hasattr(module, 'register_callbacks'):
+        #     module.register_callbacks(app, sensors)
         
         # Store each tab's layout function in a dictionary for rendering
-        tab_contents[module.tab_id] = module.get_layout(sensors)
+        tab_contents[module.tab_id] = module.get_layout(sensors, app)
 
     # Set up callback to render content for the selected tab
     @app.callback(

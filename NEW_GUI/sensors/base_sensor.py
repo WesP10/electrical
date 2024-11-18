@@ -1,3 +1,4 @@
+# sensors/base_sensor.py
 from datetime import datetime
 import pandas as pd
 
@@ -21,7 +22,7 @@ class BaseSensor:
 
     def get_data(self):
         df = pd.DataFrame(self.data)
-        self.data.clear()
+        # self.data.clear()
         return df
 
     def close(self):

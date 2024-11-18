@@ -1,8 +1,9 @@
+# sensors/__init__.py
 import os
 import importlib
 from .base_sensor import BaseSensor
 
-def load_sensors(communication):
+def load_sensors(communication, app):
     sensors = []
     sensor_folder = os.path.dirname(__file__)
     for filename in os.listdir(sensor_folder):

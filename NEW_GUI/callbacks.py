@@ -2,6 +2,7 @@
 from dash.dependencies import Input, Output
 from dash import html
 import dash_bootstrap_components as dbc
+import tabs
 
 def register_callbacks(app, sensors):
     """
@@ -34,3 +35,12 @@ def register_callbacks(app, sensors):
             return "Emergency Activated"
         else:
             return "Emergency"
+    
+    # Sensor-specific callbacks
+    for sensor in sensors:
+        if hasattr(sensor, 'register_callbacks'):
+            sensor.register_callbacks(app)
+
+    for tab in tabs.get_tab_modules():
+        if hasattr(tab, 'register_callbacks'):
+            tab.register_callbacks(app, sensors)
