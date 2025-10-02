@@ -2,6 +2,17 @@
 
 This repository contains the electrical team's code, documentation, and resources for the Cornell Hyperloop project.
 
+### Current Team Members
+* **Aislinn Ennis**Electrical Lead
+* **Weston Clark**: ECC Lead
+* **Lalo Esparza**: Power Systems Lead
+
+#### ECC Team
+* Weston Clark, Jordan Zeiger, Prayga Babbar
+#### Power Systems Team  
+* Lalo Esparza, Tribeca Kao
+
+
 ## Quick Start
 
 ### New Team Members (Docker - Recommended)
@@ -29,17 +40,6 @@ source venv/bin/activate  # macOS/Linux
 pip install -r requirements.txt
 python app.py
 ```
-
-### Current Team Members
-* **Aislinn Ennis**Electrical Lead
-* **Weston Clark**: ECC Lead
-* **Lalo Esparza**: Power Systems Lead
-
-#### ECC Team
-* Weston Clark, Jordan Zeiger, Prayga Babbar
-#### Power Systems Team  
-* Lalo Esparza, Tribeca Kao
-
 
 ## Project Structure
 
