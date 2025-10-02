@@ -1,0 +1,38 @@
+services:
+  hyperloop-gui:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: hyperloop-dashboard
+    ports:
+      - "8050:8050"
+    environment:
+      - DASH_HOST=0.0.0.0
+      - DASH_PORT=8050
+      - DASH_DEBUG=false
+    volumes:
+      # Mount for development (optional - remove for production)
+      - ..:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8050"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Add a database service if needed in the future
+  # database:
+  #   image: postgres:13
+  #   container_name: hyperloop-db
+  #   environment:
+  #     POSTGRES_DB: hyperloop
+  #     POSTGRES_USER: hyperloop
+  #     POSTGRES_PASSWORD: hyperloop123
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+
+# volumes:
+#   postgres_data:

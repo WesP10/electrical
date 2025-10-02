@@ -1,17 +1,48 @@
-cycler==0.10.0
-future==0.18.2
-iso8601==0.1.12
-kiwisolver==1.1.0
-matplotlib==3.2.0
-numpy
-pyparsing==2.4.6
-PyQt5
-PyQt5-Qt5
-PyQt5-sip
-pyqtgraph
-python-dateutil==2.8.1
-PyYAML==5.3
-PyOpenGL
-qtgui==0.0.1
-serial
-six==1.14.0
+# Cornell Hyperloop GUI Dependencies
+# Using latest compatible versions for Python 3.11+
+# Pin only when specific versions are required for compatibility
+
+# Core web framework
+dash>=2.18.1
+dash-bootstrap-components>=1.6.0
+flask>=3.0.3
+
+# Data processing (Python 3.11 compatible versions)
+numpy>=2.0.0
+pandas>=2.0.0
+plotly>=5.24.0
+
+# Serial communication
+pyserial>=3.5
+
+# Utility libraries
+requests>=2.32.0
+pyyaml>=6.0.0
+python-dateutil>=2.9.0
+
+# Core Python utilities (let pip handle these)
+click
+certifi
+charset-normalizer
+blinker
+future
+idna
+importlib-metadata
+iso8601
+itsdangerous
+jinja2
+markupsafe
+nest-asyncio
+packaging
+pytz
+retrying
+six
+tenacity
+typing-extensions
+tzdata
+urllib3
+werkzeug
+zipp
+
+# Remove duplicate serial package
+# serial==0.0.97  # This conflicts with pyserial

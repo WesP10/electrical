@@ -1,0 +1,8 @@
+services:
+  hyperloop-gui:
+    environment:
+      - DASH_DEBUG=true
+    volumes:
+      - ..:/app
+      - /app/__pycache__  # Exclude pycache from mounting
+    command: python app.py --reload
