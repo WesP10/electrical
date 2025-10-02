@@ -2,6 +2,45 @@
 
 This repository contains the electrical team's code, documentation, and resources for the Cornell Hyperloop project.
 
+## Quick Start
+
+### New Team Members (Docker - Recommended)
+**Fully automated setup - just run one command:**
+
+```bash
+cd GUI/docker
+./start.bat     # Windows
+./start.sh      # macOS/Linux
+```
+
+This will automatically:
+- Build the Docker container
+- Install all dependencies
+- Start the dashboard at `http://localhost:8050`
+
+**See `GUI/docker/README.md` for detailed Docker setup guide.**
+
+### Alternative: Python Virtual Environment (Legacy)
+```bash
+cd GUI
+python -m venv venv
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # macOS/Linux
+pip install -r requirements.txt
+python app.py
+```
+
+### Current Team Members
+* **Aislinn Ennis**Electrical Lead
+* **Weston Clark**: ECC Lead
+* **Lalo Esparza**: Power Systems Lead
+
+#### ECC Team
+* Weston Clark, Jordan Zeiger, Prayga Babbar
+#### Power Systems Team  
+* Lalo Esparza, Tribeca Kao
+
+
 ## Project Structure
 
 The repository has been reorganized into a clean, scalable structure with four main directories:
@@ -41,44 +80,6 @@ The repository has been reorganized into a clean, scalable structure with four m
 - `Workshop/` - Tutorial and learning code
 - **Status**: Archived for historical reference
 
-## Quick Start
-
-### New Team Members (Docker - Recommended)
-**Fully automated setup - just run one command:**
-
-```bash
-cd GUI/docker
-./start.bat     # Windows
-./start.sh      # macOS/Linux
-```
-
-This will automatically:
-- Build the Docker container
-- Install all dependencies
-- Start the dashboard at `http://localhost:8050`
-
-**See `GUI/docker/README.md` for detailed Docker setup guide.**
-
-### Alternative: Python Virtual Environment (Legacy)
-```bash
-cd GUI
-python -m venv venv
-venv\Scripts\activate  # Windows
-source venv/bin/activate  # macOS/Linux
-pip install -r requirements.txt
-python app.py
-```
-
-### Current Team Members
-* **Aislinn Ennis**Electrical Lead
-* **Weston Clark**: ECC Lead
-* **Lalo Esparza**: Power Systems Lead
-
-#### ECC Team
-* Weston Clark, Jordan Zeiger, Prayga Babbar
-#### Power Systems Team  
-* Lalo Esparza, Tribeca Kao
-
 ## Development Guidelines
 
 ### Adding New Features
@@ -91,16 +92,16 @@ python app.py
 - **Migration**: When updating legacy features, implement in `GUI/` or appropriate active directory
 - **Documentation**: Update documentation when migrating functionality
 
-## 📋 Project Status
+## Project Status
 
 | Component | Status | Description |
 |-----------|--------|-------------|
 | GUI Dashboard | Active | Modern Dash-based interface |
 | Sensor Integration | In Progress | Migrating from legacy implementations & adding new sensors |
-| Communication Protocol | Legacy | ZCM implementation in depreciated/ |
+| Communication Protocol | Legacy | ZCM implementation in depreciated |
 | Documentation | Legacy | Now use Confluence |
 
-## 🔧 Technology Stack
+## Technology Stack
 
 **Current Active Stack:**
 - **Frontend**: Python Dash, Dash Bootstrap Components, Plotly
