@@ -2,11 +2,11 @@
 
 This repository contains the electrical team's code, documentation, and resources for the Cornell Hyperloop project.
 
-## 🏗️ Project Structure
+## Project Structure
 
 The repository has been reorganized into a clean, scalable structure with four main directories:
 
-### 📱 `GUI/` - Active User Interface
+###  `GUI/` - Active User Interface
 **Current Dash-based web application for sensor monitoring and control**
 - **Technology**: Python Dash with Bootstrap components
 - **Purpose**: Real-time sensor dashboard with modular architecture
@@ -16,32 +16,32 @@ The repository has been reorganized into a clean, scalable structure with four m
   - Modular sensor cards
   - Emergency controls
 - **Setup**: See `GUI/README.md` for detailed setup instructions
-- **Status**: ✅ Active development
+- **Status**: Active development
 
-### 📚 `documentation/` - Project Documentation
+### `documentation/` - Project Documentation
 **All current documentation, diagrams, and technical specs**
 - `Diagrams/` - System architecture and wiring diagrams
 - `docs/` - Technical documentation
 - PDF documents and specifications
-- **Status**: ✅ Current documentation
+- **Status**: Current documentation
 
-### ⚠️ `depreciated/` - Legacy Code (Preserved for Reference)
+### `depreciated/` - Legacy Code (Preserved for Reference)
 **Older implementations that are no longer actively maintained**
 - `Communications/` - ZCM communication protocol implementation
 - `Sensors/` - Legacy sensor libraries and Arduino code
 - `State_Estimation/` - State machine and estimation algorithms
 - `Old/` - Previous software versions and implementations
 - `zcm testing/` - Communication protocol testing
-- **Status**: 🔄 Preserved for reference, not actively maintained
+- **Status**: Preserved for reference, not actively maintained
 
-### 🗄️ `archived_resources/` - Historical Resources
+### `archived_resources/` - Historical Resources
 **Legacy web interfaces and learning materials**
 - `Website/` - Previous React-based web interface
 - `WebsiteTemplate/` - React template and components
 - `Workshop/` - Tutorial and learning code
-- **Status**: 📦 Archived for historical reference
+- **Status**: Archived for historical reference
 
-## 🚀 Quick Start
+## Quick Start
 
 ### New Team Members (Docker - Recommended)
 **Fully automated setup - just run one command:**
@@ -53,9 +53,9 @@ cd GUI/docker
 ```
 
 This will automatically:
-- ✅ Build the Docker container
-- ✅ Install all dependencies
-- ✅ Start the dashboard at `http://localhost:8050`
+- Build the Docker container
+- Install all dependencies
+- Start the dashboard at `http://localhost:8050`
 
 **See `GUI/docker/README.md` for detailed Docker setup guide.**
 
@@ -71,7 +71,7 @@ python app.py
 
 ### Current Team Members
 * **Aislinn Ennis**Electrical Lead
-* **Weston Clark**: ECC Leads  
+* **Weston Clark**: ECC Lead
 * **Lalo Esparza**: Power Systems Lead
 
 #### ECC Team
@@ -79,7 +79,7 @@ python app.py
 #### Power Systems Team  
 * Lalo Esparza, Tribeca Kao
 
-## 🛠️ Development Guidelines
+## Development Guidelines
 
 ### Adding New Features
 - **GUI Components**: Add to `GUI/` following the modular architecture
@@ -95,10 +95,10 @@ python app.py
 
 | Component | Status | Description |
 |-----------|--------|-------------|
-| GUI Dashboard | ✅ Active | Modern Dash-based interface |
-| Sensor Integration | 🔄 In Progress | Migrating from legacy implementations |
-| Communication Protocol | ⚠️ Legacy | ZCM implementation in depreciated/ |
-| Documentation | ✅ Current | Organized in documentation/ |
+| GUI Dashboard | Active | Modern Dash-based interface |
+| Sensor Integration | In Progress | Migrating from legacy implementations & adding new sensors |
+| Communication Protocol | Legacy | ZCM implementation in depreciated/ |
+| Documentation | Legacy | Now use Confluence |
 
 ## 🔧 Technology Stack
 
