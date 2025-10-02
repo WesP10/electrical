@@ -113,21 +113,21 @@ python app.py
 - **Web Interface**: React, JavaScript
 - **Embedded**: Arduino, C/C++
 
-## 📖 Getting Help
+## Getting Help
 
 1. **Current Development**: Check `GUI/README.md` for detailed setup and development guides
 2. **Architecture Questions**: Review `documentation/` for system diagrams and specs  
 3. **Legacy Reference**: Browse `depreciated/` for historical implementations
 4. **Team Communication**: Contact team leads for project-specific questions
 
-## 🤝 Contributing
+## Contributing
 
 1. **New Features**: Implement in `GUI/` following the modular architecture
 2. **Documentation**: Update `documentation/` for any architectural changes
 3. **Testing**: Add tests for new functionality
 4. **Legacy Code**: Do not modify code in `depreciated/` or `archived_resources/`
 
-## 📝 Migration Notes
+## Migration Notes
 
 This repository was restructured in October 2025 to improve maintainability and scalability:
 
