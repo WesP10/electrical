@@ -3,6 +3,15 @@ import threading
 import time
 from abc import ABC, abstractmethod
 import serial
+import sys
+from pathlib import Path
+
+# Add GUI directory to path for config package imports
+gui_dir = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(gui_dir))
+from config.log_config import get_logger
+
+logger = get_logger(__name__)
 
 class CommunicationInterface(ABC):
     def __init__(self):
@@ -33,64 +42,99 @@ class PySerialCommunication(CommunicationInterface):
         self.thread.start()
 
     def connect(self):
-        while self.running:
+        # Check if this is a mock port (no real hardware)
+        if self.port == 'loop://' or self.port.startswith('mock'):
+            logger.info(f"[MOCK MODE] Using mock communication - no hardware connection needed")
+            logger.info(f"[MOCK MODE] Port configured as: {self.port}")
+            self.serial_conn = None  # No real connection for mock mode
+            return
+        
+        retry_count = 0
+        max_retries = 3  # Limit retries to avoid endless loops
+        
+        while self.running and retry_count < max_retries:
             try:
-                print(f"Attempting to connect to serial port {self.port}")
+                logger.info(f"Attempting to connect to serial port {self.port} (attempt {retry_count + 1}/{max_retries})")
                 self.serial_conn = serial.Serial(
                     port=self.port,
                     baudrate=self.baudrate,
                     timeout=self.timeout
                 )
                 time.sleep(2)  # Wait for Arduino to reset if necessary
-                print(f"Connected to serial port {self.port}")
+                logger.info(f"[SUCCESS] Successfully connected to serial port {self.port}")
                 break  # Exit the loop once connected
             except serial.SerialException as e:
-                print(f"Error connecting to serial port {self.port}: {e}")
-                print(f"Retrying in {self.reconnect_interval} seconds...")
-                time.sleep(self.reconnect_interval)
+                retry_count += 1
+                logger.warning(f"[ERROR] Error connecting to serial port {self.port}: {e}")
+                if retry_count < max_retries:
+                    logger.info(f"Retrying in {self.reconnect_interval} seconds... ({retry_count}/{max_retries})")
+                    time.sleep(self.reconnect_interval)
+                else:
+                    logger.error(f"[ERROR] Failed to connect after {max_retries} attempts. Switching to mock mode.")
+                    logger.info(f"[MOCK MODE] No microcontroller detected - using simulated data")
+                    self.port = 'mock://fallback'  # Mark as mock mode
+                    self.serial_conn = None
+                    break
             except Exception as e:
-                print(f"Unexpected error: {e}")
-                print(f"Retrying in {self.reconnect_interval} seconds...")
-                time.sleep(self.reconnect_interval)
+                retry_count += 1
+                logger.error(f"[ERROR] Unexpected error: {e}")
+                if retry_count < max_retries:
+                    logger.info(f"Retrying in {self.reconnect_interval} seconds... ({retry_count}/{max_retries})")
+                    time.sleep(self.reconnect_interval)
+                else:
+                    logger.error(f"[ERROR] Failed to connect after {max_retries} attempts. Switching to mock mode.")
+                    logger.info(f"[MOCK MODE] Hardware connection failed - using simulated data")
+                    self.port = 'mock://fallback'  # Mark as mock mode
+                    self.serial_conn = None
+                    break
 
     def read_loop(self):
         self.connect()
+        
+        # If we're in mock mode, don't try to read from serial
+        if self.port.startswith('mock') or self.port == 'loop://':
+            logger.info("[MOCK MODE] Mock communication active - no serial reading needed")
+            logger.info("[MOCK MODE] Real sensor data will be provided by MockCommunication service")
+            while self.running:
+                time.sleep(1)  # Just sleep in mock mode
+            return
+        
         while self.running:
             if self.serial_conn and self.serial_conn.is_open:
-                # print("Serial connection is open.")
                 try:
                     with self.serial_lock:
                         line = self.serial_conn.readline().decode('utf-8').strip()
                     if line:
-                        # print(f"Received line: {line}")
+                        logger.debug(f"Received line: {line}")
                         sensor_id, data_str = self.parse_message(line)
                         if sensor_id and sensor_id in self.callbacks:
                             data_values = data_str.split(',')
                             self.callbacks[sensor_id](data_values)
                 except serial.SerialException as e:
-                    print(f"SerialException occurred: {e}")
-                    print("Closing connection and attempting to reconnect...")
+                    logger.warning(f"SerialException occurred: {e}")
+                    logger.info("Closing connection and attempting to reconnect...")
                     with self.serial_lock:
                         try:
                             self.serial_conn.close()
                         except Exception as close_exception:
-                            print(f"Error closing serial connection: {close_exception}")
+                            logger.error(f"Error closing serial connection: {close_exception}")
                         self.serial_conn = None
                     self.connect()
                 except Exception as e:
-                    print(f"Unexpected error during read: {e}")
+                    logger.error(f"Unexpected error during read: {e}")
                     # Close the serial connection and attempt to reconnect
                     with self.serial_lock:
                         if self.serial_conn:
                             try:
                                 self.serial_conn.close()
                             except Exception as close_exception:
-                                print(f"Error closing serial connection: {close_exception}")
+                                logger.error(f"Error closing serial connection: {close_exception}")
                             self.serial_conn = None
                     self.connect()
             else:
-                print("Serial connection is not open. Attempting to reconnect...")
-                self.connect()
+                if not self.port.startswith('mock'):
+                    logger.debug("Serial connection is not open. Attempting to reconnect...")
+                    self.connect()
             time.sleep(0.1)  # Small delay to prevent a tight loop
 
     def parse_message(self, message):
@@ -105,9 +149,13 @@ class PySerialCommunication(CommunicationInterface):
         if self.serial_conn and self.serial_conn.is_open:
             try:
                 self.serial_conn.close()
-                print("Serial connection closed.")
+                logger.info("Serial connection closed successfully")
             except Exception as e:
-                print(f"Error closing serial connection: {e}")
+                logger.error(f"Error closing serial connection: {e}")
+        elif self.port.startswith('mock') or self.port == 'loop://':
+            logger.info("[MOCK MODE] Mock communication closed - no hardware to disconnect")
+        else:
+            logger.info("No active serial connection to close")
 
 
 # ZCM Communication Implementation

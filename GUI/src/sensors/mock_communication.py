@@ -7,6 +7,11 @@ from datetime import datetime
 from typing import Dict, Callable
 
 from services.communication_service import BaseCommunication
+import sys
+from pathlib import Path
+# Add GUI directory to path for config package imports
+gui_dir = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(gui_dir))
 from config.log_config import get_logger
 
 logger = get_logger(__name__)

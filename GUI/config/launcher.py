@@ -7,13 +7,8 @@ import sys
 import argparse
 from pathlib import Path
 
-# Set up centralized cache directory BEFORE importing any other modules  
-config_dir = Path(__file__).parent
-project_root = config_dir.parent.parent
-cache_dir = project_root / "__pycache__"
-os.environ["PYTHONPYCACHEPREFIX"] = str(cache_dir)
-
 # Add the config directory to path for environment setup
+config_dir = Path(__file__).parent
 sys.path.insert(0, str(config_dir))
 
 from environment import setup_environment, get_src_dir

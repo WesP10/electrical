@@ -3,10 +3,16 @@
 
 import os
 import sys
+from pathlib import Path
 from typing import Optional
 
-# Add current directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add GUI directory to path for config package imports
+current_file = Path(__file__).resolve()
+src_dir = current_file.parent
+gui_dir = src_dir.parent
+
+sys.path.insert(0, str(src_dir))
+sys.path.insert(0, str(gui_dir))
 
 # Set up centralized cache directory
 from config.environment import setup_environment

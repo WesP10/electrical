@@ -2,11 +2,15 @@
 venv/
 .venv/
 
-# Python cache (centralized)
-__pycache__/
+# Python cache (centralized at root level only)
+# Note: All __pycache__ directories are now consolidated into /GUI/__pycache__/
+/__pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# Prevent any scattered cache directories (backup safety)
+**/__pycache__/
 
 # Testing and coverage
 .pytest_cache/
@@ -37,3 +41,6 @@ logs/
 build/
 dist/
 *.egg-info/
+
+# Keep launcher scripts in version control
+# run.py, run.ps1, run.bat are intentionally tracked

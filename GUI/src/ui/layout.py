@@ -9,6 +9,11 @@ from ui.pages.profile_page import ProfilePage
 from core.dependencies import container
 from services.sensor_service import SensorService
 from services.profile_service import ProfileService
+import sys
+from pathlib import Path
+# Add GUI directory to path for config package imports
+gui_dir = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(gui_dir))
 from config.log_config import get_logger
 
 logger = get_logger(__name__)

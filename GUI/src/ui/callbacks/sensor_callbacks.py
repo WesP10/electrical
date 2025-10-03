@@ -7,6 +7,11 @@ from typing import List, Dict, Any
 from core.dependencies import container
 from services.sensor_service import SensorService
 from ui.components.sensor import SensorCard
+import sys
+from pathlib import Path
+# Add GUI directory to path for config package imports
+gui_dir = Path(__file__).parent.parent.parent.parent
+sys.path.insert(0, str(gui_dir))
 from config.log_config import get_logger
 
 logger = get_logger(__name__)

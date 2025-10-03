@@ -2,6 +2,11 @@
 from typing import Optional, Dict, Callable, Any
 from abc import ABC, abstractmethod
 
+import sys
+from pathlib import Path
+# Add GUI directory to path for config package imports
+gui_dir = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(gui_dir))
 from config.settings import CommunicationConfig
 from config.log_config import get_logger
 from core.exceptions import CommunicationError
@@ -47,14 +52,18 @@ class CommunicationService:
         """Initialize the communication implementation."""
         try:
             if self.config.use_mock:
+                logger.info("[MASK] [MOCK MODE] Mock communication explicitly requested")
                 self._communication = self._create_mock_communication()
+                logger.info("[SUCCESS] [MOCK MODE] Mock communication initialized - using simulated sensor data")
             else:
+                logger.info("[PLUG] [HARDWARE MODE] Attempting to initialize serial communication")
                 self._communication = self._create_serial_communication()
-            logger.info("Communication initialized successfully")
+                logger.info("[SUCCESS] [HARDWARE MODE] Serial communication initialized successfully")
         except Exception as e:
-            logger.warning(f"Failed to initialize primary communication: {e}")
-            logger.info("Falling back to mock communication")
+            logger.warning(f"[WARNING] Failed to initialize hardware communication: {e}")
+            logger.info("[MASK] [FALLBACK] Switching to mock communication for development/testing")
             self._communication = self._create_mock_communication()
+            logger.info("[SUCCESS] [MOCK MODE] Mock communication initialized as fallback")
     
     def _create_serial_communication(self) -> BaseCommunication:
         """Create a serial communication instance."""

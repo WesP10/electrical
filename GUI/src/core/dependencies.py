@@ -1,5 +1,10 @@
 """Dependency injection container for the application."""
 from typing import Any, Dict, Type, TypeVar, Optional, Callable
+import sys
+from pathlib import Path
+# Add GUI directory to path for config package imports
+gui_dir = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(gui_dir))
 from config.settings import AppConfig
 from config.log_config import get_logger
 
