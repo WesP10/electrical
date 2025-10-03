@@ -24,12 +24,12 @@ python run.py
 ```
 
 This intelligent launcher will automatically:
-- ✅ **Detect your operating system** (Windows/macOS/Linux)
-- ✅ **Scan for connected microcontrollers** (Arduino, ESP32, etc.)
-- ✅ **Choose optimal launcher script** (PowerShell/Batch/Shell)
-- ✅ **Set up centralized Python cache** (organized `__pycache__`)
-- ✅ **Start the dashboard** at `http://localhost:8050`
-- ✅ **Use mock data** if no hardware is detected
+-  **Detect your operating system** (Windows/macOS/Linux)
+-  **Scan for connected microcontrollers** (Arduino, ESP32, etc.)
+-  **Choose optimal launcher script** (PowerShell/Batch/Shell)
+-  **Set up centralized Python cache** (organized `__pycache__`)
+-  **Start the dashboard** at `http://localhost:8050`
+-  **Use mock data** if no hardware is detected
 
 **See `GUI/SIMPLE_SETUP.md` for detailed setup guide and advanced options.**
 
