@@ -8,9 +8,9 @@ This repository contains the electrical team's code, documentation, and resource
 * **Lalo Esparza**: Power Systems Lead
 
 #### ECC Team
-* Weston Clark, Jordan Zeiger, Prayga Babbar
+* Weston Clark, Jordan Zeiger, Prayga Babbar, Parth Mittal
 #### Power Systems Team  
-* Lalo Esparza, Tribeca Kao
+* Lalo Esparza, Tribeca Kao, Raphael Popescu
 
 
 ## Quick Start
