@@ -1,4 +1,39 @@
-venv
+# Virtual environments
+venv/
+.venv/
+
+# Python cache (centralized)
 __pycache__/
-*/__pycache__/
-__pycache__/*
+*.pyc
+*.pyo
+*.pyd
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+.tox/
+
+# Environment and config
+.env
+.env.local
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# IDE files
+.vscode/settings.json
+.idea/
+*.sublime-*
+
+# Build artifacts
+build/
+dist/
+*.egg-info/

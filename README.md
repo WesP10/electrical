@@ -3,7 +3,7 @@
 This repository contains the electrical team's code, documentation, and resources for the Cornell Hyperloop project.
 
 ### Current Team Members
-* **Aislinn Ennis**Electrical Lead
+* **Aislinn Ennis**: Electrical Lead
 * **Weston Clark**: ECC Lead
 * **Lalo Esparza**: Power Systems Lead
 
