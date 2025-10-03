@@ -15,7 +15,7 @@ This repository contains the electrical team's code, documentation, and resource
 
 ## Quick Start
 
-### New Team Members (Intelligent Launcher - Recommended)
+### For New Team Members (Launcher - Recommended)
 **One-command setup with automatic hardware detection:**
 
 ```bash
@@ -23,7 +23,7 @@ cd GUI
 python run.py
 ```
 
-This intelligent launcher will automatically:
+The launcher will automatically:
 -  **Detect your operating system** (Windows/macOS/Linux)
 -  **Scan for connected microcontrollers** (Arduino, ESP32, etc.)
 -  **Choose optimal launcher script** (PowerShell/Batch/Shell)
