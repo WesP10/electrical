@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 
 class ProfileType(Enum):
     """Enumeration of available system profiles."""
-    PRE_ACCELERATION = ("1", "Pre Acceleration", "primary")
+    PRE_ACCELERATION = ("1", "Pre-Accel", "primary")
     ACCELERATION = ("2", "Acceleration", "primary")
     CRUISE = ("3", "Cruise", "success")
     DECELERATION = ("4", "Deceleration", "warning")

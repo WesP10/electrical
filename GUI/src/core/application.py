@@ -59,11 +59,18 @@ class HyperloopGUIApplication:
             return self._app
         
         try:
+            # Include Font Awesome for icons
+            external_stylesheets = [
+                dbc.themes.BOOTSTRAP,
+                "https://use.fontawesome.com/releases/v5.15.4/css/all.css"
+            ]
+            
             self._app = Dash(
                 __name__,
-                external_stylesheets=[dbc.themes.BOOTSTRAP],
+                external_stylesheets=external_stylesheets,
                 suppress_callback_exceptions=self.config.suppress_callback_exceptions,
-                title=self.config.title
+                title=self.config.title,
+                assets_folder='assets'
             )
             
             # Setup layout
