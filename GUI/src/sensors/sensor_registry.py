@@ -53,20 +53,32 @@ class SensorRegistry:
                 if hasattr(module, 'Sensor'):
                     sensor_class = getattr(module, 'Sensor')
                     
-                    # Create a temporary instance to get the sensor info
-                    temp_instance = sensor_class(None)  # Pass None for communication_service
-                    sensor_id = temp_instance.get_sensor_id()
-                    sensor_name = temp_instance.get_name()
-                    
-                    self.sensor_classes[sensor_id] = {
-                        'class': sensor_class,
-                        'name': sensor_name,
-                        'module': sensor_file,
-                        'data_fields': temp_instance.get_data_fields(),
-                        'units': temp_instance.get_units()
-                    }
-                    
-                    logger.info(f"Loaded sensor: {sensor_name} ({sensor_id})")
+                    # Extract sensor metadata without creating a full instance
+                    # Use class methods that don't require communication service
+                    try:
+                        # Create a minimal mock instance to get metadata without calling _register_callback
+                        class MetadataOnlySensor(sensor_class):
+                            def __init__(self):
+                                # Skip the parent __init__ to avoid communication service requirement
+                                pass
+                        
+                        metadata_instance = MetadataOnlySensor() 
+                        sensor_id = metadata_instance.get_sensor_id()
+                        sensor_name = metadata_instance.get_name()
+                        data_fields = metadata_instance.get_data_fields()
+                        units = metadata_instance.get_units()
+                        
+                        self.sensor_classes[sensor_id] = {
+                            'class': sensor_class,
+                            'name': sensor_name,
+                            'module': sensor_file,
+                            'data_fields': data_fields,
+                            'units': units
+                        }
+                        
+                        logger.info(f"Loaded sensor: {sensor_name} ({sensor_id})")
+                    except Exception as e:
+                        logger.error(f"Failed to extract metadata from {sensor_file}: {e}")
                 else:
                     logger.error(f"No 'Sensor' class found in {sensor_file}.py")
                     

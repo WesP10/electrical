@@ -7,7 +7,7 @@ from config.settings import AppConfig, load_config
 from config.log_config import setup_logging, get_logger
 from core.dependencies import container
 from core.exceptions import HyperloopGUIError, CommunicationError
-from services.communication_service import CommunicationService
+from services.tcp_communication_service import CommunicationService
 from services.sensor_service import SensorService
 from services.profile_service import ProfileService
 from ui.layout import MainLayout

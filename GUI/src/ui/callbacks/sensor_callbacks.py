@@ -45,8 +45,9 @@ class SensorCallbacks:
             try:
                 logger.info(f"Callback triggered: interval={n_intervals}, sensors={selected_sensors}")
                 
-                # Get sensor service
-                sensor_service = container.get(SensorService)
+                # Get TCP communication service directly
+                from services.tcp_communication_service import CommunicationService
+                tcp_service = container.get(CommunicationService)
                 
                 if not selected_sensors:
                     logger.warning("No sensors selected")
@@ -70,18 +71,24 @@ class SensorCallbacks:
                         is_available = False
                         data = None
                     else:
-                        # Check if sensor is available based on watchdog timer logic using sensor ID
-                        is_available = sensor_service.is_sensor_available(sensor_id)
-                        # Get sensor data using sensor ID
-                        sensor_data = sensor_service.get_all_sensor_data()
-                        data = sensor_data.get(sensor_id) if is_available else None
+                        # Directly check TCP communication service for sensor data
+                        logger.info(f"🔍 Querying TCP service for sensor: {sensor_name}")
+                        is_available = tcp_service.has_recent_data_for_sensor(sensor_name)
+                        logger.info(f"📊 TCP service returned availability for {sensor_name}: {is_available}")
+                        
+                        if is_available:
+                            data = tcp_service.get_sensor_data_dataframe(sensor_name)
+                            logger.info(f"📈 Got dataframe for {sensor_name}: {len(data) if data is not None else 0} rows")
+                        else:
+                            data = None
+                            logger.info(f"❌ No data available for {sensor_name}")
                     
-                    # Count as active only if available (based on watchdog timer)
+                    # Count as active only if available (based on recent data)
                     if is_available:
                         active_count += 1
-                        logger.debug(f"Sensor {sensor_name}: Available (watchdog active)")
+                        logger.info(f"✅ Sensor {sensor_name}: Available (recent data)")
                     else:
-                        logger.debug(f"Sensor {sensor_name}: Unavailable (watchdog timeout)")
+                        logger.info(f"⭕ Sensor {sensor_name}: Unavailable (no recent data)")
                     
                     # Create sensor card with actual graph data
                     sensor_card = SensorCard(sensor_name)
@@ -92,9 +99,9 @@ class SensorCallbacks:
                         dbc.Col(card, width=12, lg=6, xl=6)
                     )
                 
-                logger.info(f"Created {len(sensor_cards)} sensor cards, {active_count} active (based on watchdog)")
+                logger.info(f"Created {len(sensor_cards)} sensor cards, {active_count} active (based on recent data)")
                 
-                # Create summary content with selected sensors count and watchdog-based active/inactive
+                # Create summary content with selected sensors count and recent data availability
                 summary_content = self._create_summary_content(
                     len(selected_sensors), 
                     active_count

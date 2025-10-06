@@ -18,7 +18,7 @@ class ServerConfig:
     """Configuration for the Dash server."""
     host: str = '127.0.0.1'
     port: int = 8050
-    debug: bool = True
+    debug: bool = False
 
 
 @dataclass
@@ -42,7 +42,7 @@ def load_config() -> AppConfig:
     server_config = ServerConfig(
         host=os.environ.get('DASH_HOST', '127.0.0.1'),
         port=int(os.environ.get('DASH_PORT', '8050')),
-        debug=os.environ.get('DASH_DEBUG', 'true').lower() == 'true'
+        debug=os.environ.get('DASH_DEBUG', 'false').lower() == 'true'
     )
     
     return AppConfig(

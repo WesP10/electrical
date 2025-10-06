@@ -84,6 +84,11 @@ class PySerialCommunication(BaseCommunication):
         self.line_buffer = deque(maxlen=buffer_size)
         self.discovered_sensors = {}  # {sensor_name: {'pins': [], 'last_seen': timestamp}}
         
+        # Debug counters for logging
+        self.lines_read_count = 0
+        self.bytes_read_count = 0
+        self.last_status_log = time.time()
+        
         logger.info(f"PySerialCommunication initialized for port {port} at {baudrate} baud")
     
     def start(self):
@@ -162,10 +167,19 @@ class PySerialCommunication(BaseCommunication):
                 # Read until newline character (blocking with timeout)
                 line_bytes = self.serial_conn.read_until(b'\n')
                 
+                # Log raw bytes received (for debugging)
+                if line_bytes:
+                    self.bytes_read_count += len(line_bytes)
+                    logger.debug(f"Raw bytes received ({len(line_bytes)} bytes): {line_bytes}")
+                
                 if line_bytes:
                     try:
                         # Decode and strip whitespace
                         line = line_bytes.decode('utf-8', errors='ignore').strip()
+                        
+                        # Log every line received (even empty ones)
+                        logger.info(f"Serial line received: '{line}'")
+                        self.lines_read_count += 1
                         
                         if line:
                             # Add to buffer
@@ -173,11 +187,22 @@ class PySerialCommunication(BaseCommunication):
                             
                             # Process the line
                             self._process_line(line)
+                        else:
+                            logger.debug("Received empty line (after stripping)")
                             
-                    except UnicodeDecodeError:
-                        # Skip lines that can't be decoded
-                        logger.debug("Skipped line with decode error")
+                    except UnicodeDecodeError as e:
+                        # Log decode errors with raw data
+                        logger.warning(f"Decode error on line {line_bytes}: {e}")
                         continue
+                else:
+                    # Log when no data is received (timeout)
+                    logger.debug("No data received (timeout or empty read)")
+                
+                # Periodic status logging every 30 seconds
+                current_time = time.time()
+                if current_time - self.last_status_log > 30:
+                    self._log_status()
+                    self.last_status_log = current_time
                         
             except serial.SerialException as e:
                 logger.error(f"Serial read error: {e}")
@@ -195,6 +220,21 @@ class PySerialCommunication(BaseCommunication):
                 time.sleep(0.1)
         
         logger.info("Serial read loop stopped")
+    
+    def _log_status(self):
+        """Log periodic status information for debugging."""
+        buffer_usage = len(self.line_buffer)
+        connection_status = "Connected" if (self.serial_conn and self.serial_conn.is_open) else "Disconnected"
+        
+        logger.info(f"Serial Status - Connection: {connection_status}, "
+                   f"Lines read: {self.lines_read_count}, "
+                   f"Bytes read: {self.bytes_read_count}, "
+                   f"Buffer usage: {buffer_usage}/{self.buffer_size}, "
+                   f"Discovered sensors: {len(self.discovered_sensors)}")
+        
+        if self.discovered_sensors:
+            sensor_names = list(self.discovered_sensors.keys())
+            logger.info(f"Active sensors: {sensor_names}")
     
     def _process_line(self, line):
         """Process a received line - either header or data."""

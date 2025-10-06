@@ -62,8 +62,10 @@ def create_app():
 
 
 # For WSGI deployment (e.g., with Gunicorn)
-app = create_app()
-server = app.server
+# Only create WSGI app when not running as main module
+if __name__ != '__main__':
+    app = create_app()
+    server = app.server
 
 if __name__ == '__main__':
     main()
