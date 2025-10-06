@@ -85,8 +85,15 @@ Write-Host ""
 # Change to GUI directory and launch Python
 Push-Location $GuiRoot
 try {
-    # Launch Python with the configured environment
-    & python @PythonArgs
+    # Use virtual environment Python if available, otherwise system Python
+    $VenvPython = Join-Path (Split-Path -Parent $GuiRoot) ".venv\Scripts\python.exe"
+    if (Test-Path $VenvPython) {
+        Write-Host "Using virtual environment Python: $VenvPython" -ForegroundColor Green
+        & $VenvPython @PythonArgs
+    } else {
+        Write-Host "Using system Python" -ForegroundColor Yellow
+        & python @PythonArgs
+    }
     $ExitCode = $LASTEXITCODE
     
     if ($ExitCode -eq 0) {

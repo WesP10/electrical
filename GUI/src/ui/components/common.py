@@ -19,27 +19,104 @@ class NavigationBar:
     def __init__(self, title: str = "Cornell Hyperloop Dashboard"):
         self.title = title
     
-    def create(self, show_emergency: bool = True) -> dbc.Navbar:
+    def create(self, show_status: bool = True) -> dbc.Navbar:
         """Create the navigation bar component."""
         children = [
             dbc.NavbarBrand(self.title, className="ms-2")
         ]
         
-        if show_emergency:
+        if show_status:
             children.append(
-                dbc.Button(
-                    "Emergency",
-                    id="emergency-button",
-                    color="danger",
-                    className="ms-auto"
+                html.Div(
+                    [
+                        html.Span("System Status: ", className="me-2 text-light"),
+                        dbc.Badge("Active", id="system-status-badge", color="success")
+                    ],
+                    className="ms-auto d-flex align-items-center"
                 )
             )
         
         return dbc.Navbar(
-            dbc.Container(children),
+            dbc.Container(children, fluid=True),
             color="primary",
             dark=True,
-            className="mb-4"
+            sticky="top",
+            className="mb-0",
+            style={
+                "position": "fixed",
+                "top": 0,
+                "left": 0,
+                "right": 0,
+                "zIndex": 1030,
+                "marginBottom": 0,
+                "borderBottom": "none"
+            }
+        )
+
+
+class Sidebar:
+    """Sidebar navigation component."""
+    
+    SIDEBAR_STYLE = {
+        "position": "fixed",
+        "top": "56px",  # Exactly below fixed navbar with no gap
+        "left": 0,
+        "bottom": 0,
+        "width": "16rem",
+        "padding": "2rem 1rem",
+        "backgroundColor": "#f8f9fa",
+        "overflowY": "auto",
+        "zIndex": 1020,
+        "marginTop": 0,
+        "borderTop": "none"
+    }
+    
+    def __init__(self):
+        self.nav_items = []
+    
+    def add_nav_item(self, item_id: str, label: str, icon: str = None, is_critical: bool = False) -> None:
+        """Add a navigation item to the sidebar."""
+        self.nav_items.append({
+            'id': item_id,
+            'label': label,
+            'icon': icon,
+            'is_critical': is_critical
+        })
+    
+    def create(self) -> html.Div:
+        """Create the sidebar component."""
+        nav_links = []
+        
+        for item in self.nav_items:
+            # Create link content
+            link_content = []
+            if item['icon']:
+                link_content.append(html.I(className=f"{item['icon']} me-2"))
+            link_content.append(item['label'])
+            
+            # Determine styling based on criticality
+            if item['is_critical']:
+                className = "nav-link text-danger fw-bold"
+            else:
+                className = "nav-link text-dark"
+            
+            nav_links.append(
+                dbc.NavLink(
+                    link_content,
+                    href=f"/{item['id']}",
+                    id=f"nav-{item['id']}",
+                    className=className
+                )
+            )
+        
+        return html.Div(
+            [
+                html.H4("Navigation", className="mb-3"),
+                html.Hr(),
+                dbc.Nav(nav_links, vertical=True, pills=True)
+            ],
+            style=self.SIDEBAR_STYLE,
+            id="sidebar"
         )
 
 

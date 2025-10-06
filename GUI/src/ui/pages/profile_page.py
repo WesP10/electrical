@@ -26,16 +26,15 @@ class ProfilePage:
         """Create the profile page layout."""
         return dbc.Container([
             dbc.Row([
-                # Profile selector
+                # Profile selector - takes full width on mobile, 8 cols on desktop
                 dbc.Col([
                     self.profile_selector.create()
-                ], width=12, md=8),
+                ], width=12, lg=8, className="mb-4"),
                 
-                # Status and history
+                # Status and history sidebar
                 dbc.Col([
                     self.profile_status.create(),
-                    html.Div(className="mb-3"),  # Spacer
                     self.profile_history.create()
-                ], width=12, md=4)
-            ])
-        ], fluid=True, id="profile-page")
+                ], width=12, lg=4)
+            ], className="g-4")
+        ], fluid=True, id="profile-page", className="py-3")

@@ -22,13 +22,13 @@ class SensorCard:
     def __init__(self, sensor_name: str):
         self.sensor_name = sensor_name
     
-    def create(self, data: Optional[pd.DataFrame] = None) -> dbc.Card:
+    def create(self, data: Optional[pd.DataFrame] = None, is_available: bool = True) -> dbc.Card:
         """Create a sensor card with graph and status."""
         # Create graph
-        graph = self._create_graph(data)
+        graph = self._create_graph(data, is_available)
         
         # Create status indicator
-        status = "active" if data is not None and not data.empty else "inactive"
+        status = "active" if is_available and data is not None and not data.empty else "inactive"
         
         return dbc.Card([
             dbc.CardHeader([
@@ -44,38 +44,47 @@ class SensorCard:
             ])
         ], className="mb-3")
     
-    def _create_graph(self, data: Optional[pd.DataFrame] = None) -> dcc.Graph:
-        """Create a graph for sensor data."""
-        if data is None or data.empty:
-            # Empty graph
-            fig = go.Figure()
-            fig.update_layout(
-                title=f"{self.sensor_name} - No Data",
-                xaxis_title="Time",
-                yaxis_title="Value"
-            )
-        else:
-            # Create traces for each data column (excluding Time)
-            fig = go.Figure()
-            for column in data.columns:
-                if column != 'Time':
-                    fig.add_trace(go.Scatter(
-                        x=data['Time'],
-                        y=data[column],
-                        mode='lines',
-                        name=column
-                    ))
-            
-            fig.update_layout(
-                title=f"{self.sensor_name} Data",
-                xaxis_title="Time",
-                yaxis_title="Value",
-                height=300
-            )
+    def _create_graph(self, data: Optional[pd.DataFrame] = None, is_available: bool = True) -> dcc.Graph:
+        """Create an empty graph that will be updated by callbacks."""
+        # Create an empty figure - the callback will populate it
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Loading...",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font=dict(size=14, color="gray"),
+            align="center"
+        )
+        
+        fig.update_layout(
+            title=f"{self.sensor_name}",
+            xaxis_title="Time",
+            yaxis_title="Value",
+            height=300,
+            margin=dict(l=50, r=30, t=50, b=50),
+            xaxis=dict(
+                showgrid=True, 
+                zeroline=True,
+                range=[0, 10],  # Show default range
+                showticklabels=True
+            ),
+            yaxis=dict(
+                showgrid=True, 
+                zeroline=True,
+                range=[0, 100],  # Show default range
+                showticklabels=True
+            ),
+            plot_bgcolor='rgba(248, 249, 250, 0.8)',
+            paper_bgcolor='white'
+        )
         
         return dcc.Graph(
             id=f"{self.sensor_name}-graph",
-            figure=fig
+            figure=fig,
+            style={'height': '300px', 'width': '100%'}
         )
 
 
@@ -111,35 +120,164 @@ class SensorSelector:
     def __init__(self, sensor_names: List[str]):
         self.sensor_names = sensor_names
     
-    def create(self) -> html.Div:
-        """Create sensor selector dropdown."""
-        return html.Div([
-            html.Label('Select Sensors:', className="form-label"),
-            dcc.Dropdown(
-                id='sensor-dropdown',
-                options=[{'label': name, 'value': name} for name in self.sensor_names],
-                multi=True,
-                value=self.sensor_names,  # Default to all sensors
-                className="mb-3"
-            )
-        ])
+    def create(self) -> dbc.Card:
+        """Create sensor selector card with modern styling."""
+        return dbc.Card([
+            dbc.CardHeader(
+                html.H5("Sensor Filter", className="mb-0")
+            ),
+            dbc.CardBody([
+                html.Label('Select Sensors to Display:', className="form-label text-muted mb-2 small"),
+                dcc.Dropdown(
+                    id='sensor-dropdown',
+                    options=[{'label': name, 'value': name} for name in self.sensor_names],
+                    multi=True,
+                    value=self.sensor_names,  # Default to all sensors
+                    placeholder="Choose sensors to display...",
+                    className="mb-2"
+                ),
+                html.Div([
+                    html.I(className="fas fa-info-circle me-1 text-muted"),
+                    html.Small(
+                        f"{len(self.sensor_names)} sensors available",
+                        className="text-muted"
+                    )
+                ], className="d-flex align-items-center")
+            ], className="p-3")
+        ], className="mb-3 shadow-sm")
+
+
+class MicrocontrollerIOMap:
+    """Microcontroller I/O pin mapping visualization component."""
+    
+    def __init__(self, sensor_names: List[str], use_mock: bool = True):
+        self.sensor_names = sensor_names
+        self.use_mock = use_mock
+        # Define pin mappings (this would typically come from configuration)
+        self.pin_mappings = self._generate_pin_mappings(sensor_names) if not use_mock else {}
+    
+    def _generate_pin_mappings(self, sensor_names: List[str]) -> Dict[str, Dict[str, Any]]:
+        """Generate pin mappings for sensors."""
+        # Example pin mapping - in a real application, this would come from config
+        pin_types = ['Analog', 'Digital', 'I2C', 'SPI', 'UART']
+        colors = ['primary', 'success', 'info', 'warning', 'secondary']
+        
+        mappings = {}
+        for idx, sensor in enumerate(sensor_names):
+            pin_type = pin_types[idx % len(pin_types)]
+            mappings[sensor] = {
+                'pin': f"A{idx}" if pin_type == 'Analog' else f"D{idx}",
+                'type': pin_type,
+                'color': colors[idx % len(colors)]
+            }
+        return mappings
+    
+    def create(self) -> dbc.Card:
+        """Create microcontroller I/O visualization card."""
+        # Check if we have pin mappings or if we're in mock mode
+        if not self.pin_mappings or self.use_mock:
+            # Show "no sensors connected" state
+            card_content = dbc.CardBody([
+                html.Div([
+                    html.I(className="fas fa-plug-circle-xmark fa-3x text-muted mb-3"),
+                    html.H6("No Hardware Detected", className="text-muted mb-2"),
+                    html.P(
+                        "Microcontroller I/O mapping will appear here when hardware is connected.",
+                        className="text-muted small mb-0",
+                        style={'fontSize': '0.8rem'}
+                    )
+                ], className="text-center py-4", id="io-mapping-grid")
+            ], className="p-3", style={'minHeight': '180px', 'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center'})
+        else:
+            # Create compact pin list with clean professional design
+            pin_elements = []
+            for sensor, info in self.pin_mappings.items():
+                pin_row = html.Div([
+                    html.Div([
+                        dbc.Badge(
+                            info['pin'],
+                            color=info['color'],
+                            className="fw-bold",
+                            style={'fontSize': '0.7rem', 'padding': '0.25rem 0.5rem', 'minWidth': '32px', 'textAlign': 'center'}
+                        )
+                    ], style={'width': '45px', 'flexShrink': '0'}),
+                    html.Div([
+                        html.Span(sensor, className="fw-semibold", style={'fontSize': '0.875rem'})
+                    ], className="flex-grow-1 px-2"),
+                    html.Div([
+                        html.Span(
+                            info['type'],
+                            className="text-muted small",
+                            style={'fontSize': '0.75rem'}
+                        )
+                    ], style={'width': '60px', 'textAlign': 'right', 'flexShrink': '0'})
+                ], className="d-flex align-items-center py-1 px-2 mb-1 io-pin-row",
+                   style={
+                       'borderLeft': f'3px solid var(--bs-{info["color"]})',
+                       'backgroundColor': '#fafafa',
+                       'borderRadius': '3px',
+                       'transition': 'all 0.2s ease'
+                   })
+                
+                pin_elements.append(pin_row)
+            
+            card_content = dbc.CardBody([
+                html.Div(
+                    pin_elements,
+                    id="io-mapping-grid",
+                    className="compact-io-list"
+                )
+            ], className="p-2", style={'maxHeight': '220px', 'overflowY': 'auto'})
+        
+        return dbc.Card([
+            dbc.CardHeader([
+                html.Div([
+                    html.H5("I/O Mapping", className="mb-0 d-inline", style={'fontSize': '1rem'})
+                ])
+            ], className="py-2"),
+            card_content
+        ], className="mb-3 shadow-sm", id="io-map-card")
 
 
 class SensorSummary:
     """Sensor summary component."""
     
-    def create(self, total_sensors: int = 0, active_sensors: int = 0) -> dbc.Card:
+    def create(self, selected_sensors: int = 0, active_sensors: int = 0) -> dbc.Card:
         """Create sensor summary card."""
-        return InfoCard.create(
-            title="Sensor Summary",
-            content=[
-                html.P(f"Total Sensors: {total_sensors}"),
-                html.P(f"Active Sensors: {active_sensors}"),
-                html.P(f"Inactive Sensors: {total_sensors - active_sensors}"),
-                StatusIndicator.create(
-                    "connected" if active_sensors > 0 else "disconnected",
-                    "sensors-status"
-                )
-            ],
-            card_id="sensor-summary-card"
-        )
+        inactive_sensors = selected_sensors - active_sensors
+        
+        return dbc.Card([
+            dbc.CardHeader(
+                html.H5("Sensor Summary", className="mb-0")
+            ),
+            dbc.CardBody([
+                # Selected sensors
+                html.Div([
+                    html.Span("Selected Sensors", className="text-muted small d-block mb-1"),
+                    html.H4(str(selected_sensors), className="mb-0 fw-bold text-primary")
+                ], className="mb-3"),
+                
+                # Active sensors
+                html.Div([
+                    html.Span("Active", className="text-muted small d-block mb-1"),
+                    html.H5(str(active_sensors), className="mb-0 fw-bold text-success")
+                ], className="mb-3"),
+                
+                # Inactive sensors
+                html.Div([
+                    html.Span("Inactive", className="text-muted small d-block mb-1"),
+                    html.H5(str(inactive_sensors), className="mb-0 fw-bold text-secondary")
+                ], className="mb-3"),
+                
+                html.Hr(className="my-3"),
+                
+                # Overall status
+                html.Div([
+                    html.Span("System Status", className="text-muted small d-block mb-2"),
+                    StatusIndicator.create(
+                        "connected" if active_sensors > 0 else "disconnected",
+                        "sensors-status"
+                    )
+                ])
+            ], className="p-3")
+        ], id="sensor-summary-card", className="mb-3 shadow-sm")

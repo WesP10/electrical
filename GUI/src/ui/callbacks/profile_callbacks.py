@@ -37,6 +37,8 @@ class ProfileCallbacks:
         
         @app.callback(
             [Output('profile-output', 'children'),
+             Output('profile-output', 'is_open'),
+             Output('profile-output', 'color'),
              Output('current-profile-display', 'children'),
              Output('profile-history-list', 'children')],
             profile_inputs
@@ -64,7 +66,7 @@ class ProfileCallbacks:
                 # Find the profile by command
                 target_profile = profile_service.get_profile_by_command(command)
                 if not target_profile:
-                    return "Invalid profile", "None", []
+                    return "Invalid profile", True, "danger", "None", []
                 
                 # Check if transition is allowed
                 if not profile_service.can_switch_to(target_profile):
@@ -72,6 +74,8 @@ class ProfileCallbacks:
                     current_name = current.label if current else "None"
                     return (
                         f"Cannot switch to {target_profile.label} from {current_name}",
+                        True,
+                        "warning",
                         current_name,
                         self._get_history_items(profile_service)
                     )
@@ -81,7 +85,9 @@ class ProfileCallbacks:
                 
                 if success:
                     return (
-                        f"Switched to {target_profile.label}!",
+                        f"Successfully switched to {target_profile.label}!",
+                        True,
+                        "success",
                         target_profile.label,
                         self._get_history_items(profile_service)
                     )
@@ -90,13 +96,15 @@ class ProfileCallbacks:
                     current_name = current.label if current else "None"
                     return (
                         f"Failed to switch to {target_profile.label}",
+                        True,
+                        "danger",
                         current_name,
                         self._get_history_items(profile_service)
                     )
                     
             except Exception as e:
                 logger.error(f"Error handling profile button: {e}")
-                return f"Error: {e}", "Error", []
+                return f"Error: {e}", True, "danger", "Error", []
     
     def _register_profile_status_callback(self, app) -> None:
         """Register profile status update callback."""

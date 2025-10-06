@@ -38,29 +38,43 @@ class ProfileSelector:
     def __init__(self, profiles: List[ProfileType]):
         self.profiles = profiles
     
-    def create_buttons(self) -> List[dbc.Button]:
-        """Create profile buttons."""
-        buttons = []
-        for profile in self.profiles:
-            button = ProfileButton(profile).create()
-            buttons.append(button)
-        return buttons
+    def create_profile_card(self, profile: ProfileType) -> dbc.Card:
+        """Create a profile card."""
+        return dbc.Card([
+            dbc.CardBody([
+                html.H5(profile.label, className="card-title text-center mb-3"),
+                html.P(f"Command: {profile.command}", className="text-muted text-center small mb-3"),
+                dbc.Button(
+                    "Select Profile",
+                    id=f"profile-{profile.command}",
+                    color=profile.color,
+                    className="w-100",
+                    size="lg"
+                )
+            ])
+        ], className="mb-3 shadow-sm hover-lift", style={"height": "100%"})
     
     def create(self) -> html.Div:
         """Create the profile selector component."""
-        buttons = self.create_buttons()
+        # Create profile cards in a grid
+        profile_cards = []
+        for profile in self.profiles:
+            card = self.create_profile_card(profile)
+            profile_cards.append(
+                dbc.Col(card, width=12, sm=6, lg=4, xl=3, className="mb-3")
+            )
         
         return html.Div([
-            html.H2("Select Profile", className="text-center mb-4"),
-            *buttons,
-            html.Div(id="profile-output", className="mt-4 text-center"),
-        ], style={
-            "display": "flex",
-            "flexDirection": "column",
-            "alignItems": "center",
-            "justifyContent": "center",
-            "height": "80vh",
-        })
+            html.H2("Select Profile", className="mb-4"),
+            html.Hr(),
+            dbc.Alert(
+                id="profile-output",
+                is_open=False,
+                dismissable=True,
+                className="mb-4"
+            ),
+            dbc.Row(profile_cards, className="g-3")
+        ])
 
 
 class ProfileStatus:
@@ -71,14 +85,24 @@ class ProfileStatus:
     
     def create(self, current_profile: str = "None") -> dbc.Card:
         """Create profile status card."""
-        return InfoCard.create(
-            title="Current Profile",
-            content=[
-                html.H4(current_profile, id="current-profile-display"),
-                StatusIndicator.create("active" if current_profile != "None" else "inactive", "profile-status")
-            ],
-            card_id="profile-status-card"
-        )
+        return dbc.Card([
+            dbc.CardHeader(
+                html.H5("Current Profile", className="mb-0")
+            ),
+            dbc.CardBody([
+                html.Div([
+                    html.Span("Active Profile", className="text-muted d-block mb-2"),
+                    html.H4(current_profile, id="current-profile-display", className="mb-3 fw-bold text-primary")
+                ]),
+                html.Div([
+                    html.Span("Status: ", className="text-muted"),
+                    StatusIndicator.create(
+                        "active" if current_profile != "None" else "inactive",
+                        "profile-status"
+                    )
+                ], className="d-flex align-items-center")
+            ], className="p-3")
+        ], id="profile-status-card", className="mb-3 shadow-sm")
 
 
 class ProfileHistory:
@@ -90,14 +114,18 @@ class ProfileHistory:
             history = []
         
         history_items = [
-            html.Li(profile) for profile in history[-5:]  # Show last 5 profiles
+            html.Li(profile, className="mb-1") for profile in history[-5:]  # Show last 5 profiles
         ]
         
-        return InfoCard.create(
-            title="Profile History",
-            content=[
-                html.Ul(history_items, id="profile-history-list") if history_items else 
-                html.P("No profile history", className="text-muted")
-            ],
-            card_id="profile-history-card"
-        )
+        return dbc.Card([
+            dbc.CardHeader(
+                html.H5("Profile History", className="mb-0")
+            ),
+            dbc.CardBody([
+                html.Ul(
+                    history_items if history_items else [html.Li("No profile history", className="text-muted list-unstyled")],
+                    id="profile-history-list",
+                    className="mb-0" if history_items else "list-unstyled mb-0"
+                )
+            ], className="p-3")
+        ], id="profile-history-card", className="mb-3 shadow-sm")
