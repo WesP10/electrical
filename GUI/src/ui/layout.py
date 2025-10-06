@@ -23,8 +23,8 @@ logger = get_logger(__name__)
 CONTENT_STYLE = {
     "marginLeft": "18rem",
     "marginRight": "2rem",
-    "paddingTop": "76px",  # Account for fixed navbar height (56px + 20px)
-    "padding": "76px 1rem 2rem 1rem",  # Top, right, bottom, left
+    "paddingTop": "56px",  # Account for fixed navbar height
+    "padding": "56px 1rem 2rem 1rem",  # Top, right, bottom, left
     "minHeight": "100vh",  # Full viewport height
     "overflowY": "auto",  # Allow vertical scrolling
     "position": "relative"

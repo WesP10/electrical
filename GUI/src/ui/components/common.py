@@ -47,7 +47,9 @@ class NavigationBar:
                 "top": 0,
                 "left": 0,
                 "right": 0,
-                "zIndex": 1030
+                "zIndex": 1030,
+                "marginBottom": 0,
+                "borderBottom": "none"
             }
         )
 
@@ -57,14 +59,16 @@ class Sidebar:
     
     SIDEBAR_STYLE = {
         "position": "fixed",
-        "top": "76px",  # Below fixed navbar (56px + padding)
+        "top": "56px",  # Exactly below fixed navbar with no gap
         "left": 0,
         "bottom": 0,
         "width": "16rem",
         "padding": "2rem 1rem",
         "backgroundColor": "#f8f9fa",
         "overflowY": "auto",
-        "zIndex": 1020
+        "zIndex": 1020,
+        "marginTop": 0,
+        "borderTop": "none"
     }
     
     def __init__(self):
