@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Cornell Hyperloop GUI - Intelligent Launcher
-Usage: python run.py
+Usage: python run.py [--enable-logs]
 
 This launcher automatically detects:
 - Operating System (Windows/Linux/MacOS)
@@ -9,6 +9,15 @@ This launcher automatically detects:
 - Automatically starts serial communication server for Arduino
 - Optimal launcher script to use
 - Cache directory setup
+
+Options:
+  --enable-logs, --logs    Enable detailed application logging (shows INFO level)
+                          By default, only WARNING and ERROR messages are shown
+
+Examples:
+  python run.py                    # Run with minimal logging
+  python run.py --enable-logs      # Run with detailed logging
+  python run.py --logs             # Same as --enable-logs
 
 New team members only need to run: python run.py
 """
@@ -202,7 +211,7 @@ def run_with_launcher(launcher_type, launcher_path, has_microcontroller, microco
     # Filter out conflicting arguments and prepare clean args
     user_args = []
     if len(sys.argv) > 1:
-        user_args = [arg for arg in sys.argv[1:] if arg not in ['--mock', '--hardware']]
+        user_args = [arg for arg in sys.argv[1:] if arg not in ['--mock', '--hardware', '--enable-logs', '--logs']]
     
     if launcher_type == "powershell":
         cmd = ["powershell", "-ExecutionPolicy", "Bypass", "-File", str(launcher_path)]
@@ -266,6 +275,11 @@ def run_python_launcher(has_microcontroller, microcontroller_port=None):
         if not has_microcontroller and "--mock" not in sys.argv:
             sys.argv.append("--mock")
         
+        # Preserve logging flag in sys.argv for child processes
+        if "--enable-logs" in sys.argv or "--logs" in sys.argv:
+            if "--enable-logs" not in sys.argv:
+                sys.argv.append("--enable-logs")
+        
         print("Running with Python launcher...")
         launcher_main()
         return 0
@@ -301,6 +315,14 @@ def main():
     """Main entry point with intelligent detection."""
     print("[ROBOT] Cornell Hyperloop GUI - Intelligent Launcher")
     print("=" * 50)
+    
+    # Check for logging flag
+    enable_logs = "--enable-logs" in sys.argv or "--logs" in sys.argv
+    if enable_logs:
+        os.environ["ENABLE_DETAILED_LOGS"] = "true"
+        print("[LOGS] Detailed logging enabled")
+    else:
+        os.environ["ENABLE_DETAILED_LOGS"] = "false"
     
     # Set up signal handlers for graceful shutdown
     setup_signal_handlers()

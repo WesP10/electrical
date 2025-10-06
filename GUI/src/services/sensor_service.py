@@ -114,7 +114,7 @@ class SensorService:
     
     def _on_sensor_discovered(self, sensor_name: str, pins: List[str], payload: str):
         """Callback when a new sensor is discovered via header."""
-        logger.info(f"🔔 Discovery callback triggered: {sensor_name}")
+        logger.info(f"Discovery callback triggered: {sensor_name}")
         if sensor_name not in self._sensors:
             # Create new dynamic sensor
             sensor = DynamicSensor(sensor_name, pins)

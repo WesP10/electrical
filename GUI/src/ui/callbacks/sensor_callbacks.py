@@ -72,23 +72,23 @@ class SensorCallbacks:
                         data = None
                     else:
                         # Directly check TCP communication service for sensor data
-                        logger.info(f"🔍 Querying TCP service for sensor: {sensor_name}")
+                        logger.info(f"Querying TCP service for sensor: {sensor_name}")
                         is_available = tcp_service.has_recent_data_for_sensor(sensor_name)
-                        logger.info(f"📊 TCP service returned availability for {sensor_name}: {is_available}")
+                        logger.info(f"TCP service returned availability for {sensor_name}: {is_available}")
                         
                         if is_available:
                             data = tcp_service.get_sensor_data_dataframe(sensor_name)
-                            logger.info(f"📈 Got dataframe for {sensor_name}: {len(data) if data is not None else 0} rows")
+                            logger.info(f"Got dataframe for {sensor_name}: {len(data) if data is not None else 0} rows")
                         else:
                             data = None
-                            logger.info(f"❌ No data available for {sensor_name}")
+                            logger.info(f"No data available for {sensor_name}")
                     
                     # Count as active only if available (based on recent data)
                     if is_available:
                         active_count += 1
-                        logger.info(f"✅ Sensor {sensor_name}: Available (recent data)")
+                        logger.info(f"Sensor {sensor_name}: Available (recent data)")
                     else:
-                        logger.info(f"⭕ Sensor {sensor_name}: Unavailable (no recent data)")
+                        logger.info(f"Sensor {sensor_name}: Unavailable (no recent data)")
                     
                     # Create sensor card with actual graph data
                     sensor_card = SensorCard(sensor_name)

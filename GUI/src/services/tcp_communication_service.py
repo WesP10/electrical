@@ -58,7 +58,7 @@ class BaseCommunication(ABC):
         Callback signature: callback(data_values: list)
         """
         self.sensor_data_callbacks[sensor_name] = callback
-        logger.info(f"✅ Registered data callback for sensor: {sensor_name}")
+        logger.info(f"Registered data callback for sensor: {sensor_name}")
         logger.info(f"Total callbacks registered: {list(self.sensor_data_callbacks.keys())}")
     
     def deregister_data_callback(self, sensor_name):
@@ -70,7 +70,7 @@ class BaseCommunication(ABC):
     def register_callback(self, sensor_id, callback):
         """Register a callback for sensor data (legacy interface for base_sensor.py)."""
         self.sensor_data_callbacks[sensor_id] = callback
-        logger.info(f"✅ Registered legacy callback for sensor: {sensor_id}")
+        logger.info(f"Registered legacy callback for sensor: {sensor_id}")
         logger.info(f"Total callbacks registered: {list(self.sensor_data_callbacks.keys())}")
     
     def deregister_callback(self, sensor_id):
@@ -334,7 +334,7 @@ class TCPCommunication(BaseCommunication):
         """Process a response received from the serial server."""
         try:
             message_type = message.get('type')
-            logger.debug(f"🎯 Received server response: {message_type}")
+            logger.debug(f"Received server response: {message_type}")
             
             if message_type == 'periodic_update':
                 # Handle periodic data updates from server
@@ -357,7 +357,7 @@ class TCPCommunication(BaseCommunication):
                         if request_id in self.pending_requests:
                             self.pending_requests[request_id]['response'] = message
                             self.pending_requests[request_id]['event'].set()
-                            logger.info(f"✅ Matched request {request_id} with response")
+                            logger.info(f"Matched request {request_id} with response")
                             return
                 
                 logger.debug(f"Unknown response type: {message_type}")
@@ -369,17 +369,17 @@ class TCPCommunication(BaseCommunication):
         """Process data response from server."""
         try:
             data_entries = response.get('data', [])
-            logger.info(f"🔍 Processing data response with {len(data_entries)} entries")
+            logger.info(f"Processing data response with {len(data_entries)} entries")
             
             for entry in data_entries:
                 entry_type = entry.get('type')
                 logger.debug(f"Processing entry type: {entry_type}")
                 
                 if entry_type == 'discovery':
-                    logger.info(f"📡 Processing discovery entry: {entry.get('sensor_name', 'Unknown')}")
+                    logger.info(f"Processing discovery entry: {entry.get('sensor_name', 'Unknown')}")
                     self._handle_sensor_discovery(entry)
                 elif entry_type == 'sensor_data':
-                    logger.info(f"📊 Processing sensor data entry: {entry.get('sensor_name', 'Unknown')} = {entry.get('values', 'N/A')}")
+                    logger.info(f"Processing sensor data entry: {entry.get('sensor_name', 'Unknown')} = {entry.get('values', 'N/A')}")
                     self._handle_sensor_data(entry)
                 
         except Exception as e:
@@ -439,7 +439,7 @@ class TCPCommunication(BaseCommunication):
             
             # Call data callback if registered
             if sensor_name in self.sensor_data_callbacks:
-                logger.info(f"🔔 Calling callback for {sensor_name} with values {values}")
+                logger.info(f"Calling callback for {sensor_name} with values {values}")
                 self.sensor_data_callbacks[sensor_name](values)
             else:
                 logger.debug(f"No callback registered for sensor: {sensor_name}")
@@ -487,12 +487,12 @@ class TCPCommunication(BaseCommunication):
     
     def has_recent_data_for_sensor(self, sensor_name: str) -> bool:
         """Check if sensor has recent data or is actively sending data."""
-        logger.info(f"🔍 Checking recent data for sensor: {sensor_name}")
-        logger.info(f"📋 Discovered sensors: {list(self.discovered_sensors.keys())}")
+        logger.info(f"Checking recent data for sensor: {sensor_name}")
+        logger.info(f"Discovered sensors: {list(self.discovered_sensors.keys())}")
         
         # First check if sensor was ever discovered
         if sensor_name not in self.discovered_sensors:
-            logger.info(f"❌ Sensor {sensor_name} not in discovered sensors")
+            logger.info(f"Sensor {sensor_name} not in discovered sensors")
             return False
         
         current_time = time.time()
@@ -504,14 +504,14 @@ class TCPCommunication(BaseCommunication):
         discovery_timeout = 30.0
         recent_discovery = time_diff < discovery_timeout
         
-        logger.info(f"⏰ Sensor {sensor_name}: last_seen={last_seen}, current={current_time}, diff={time_diff:.2f}s")
-        logger.info(f"📊 Discovery recent: {recent_discovery} (timeout: {discovery_timeout}s)")
+        logger.info(f"Sensor {sensor_name}: last_seen={last_seen}, current={current_time}, diff={time_diff:.2f}s")
+        logger.info(f"Discovery recent: {recent_discovery} (timeout: {discovery_timeout}s)")
         
         if recent_discovery:
-            logger.info(f"✅ Sensor {sensor_name} has recent discovery data")
+            logger.info(f"Sensor {sensor_name} has recent discovery data")
             return True
         else:
-            logger.info(f"⚠️ Sensor {sensor_name} discovery data is old, but may still be active")
+            logger.info(f"Sensor {sensor_name} discovery data is old, but may still be active")
             # TODO: Could also check if server reports sensor as currently active
             # For now, assume old discovered sensors are still valid if they were recently discovered
             return time_diff < 300.0  # 5 minute absolute timeout

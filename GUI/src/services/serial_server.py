@@ -14,6 +14,7 @@ Key features:
 """
 
 import json
+import os
 import socket
 import threading
 import time
@@ -34,8 +35,11 @@ except ImportError:
     sys.exit(1)
 
 # Configure logging
+enable_detailed_logs = os.environ.get("ENABLE_DETAILED_LOGS", "false").lower() == "true"
+log_level = logging.INFO if enable_detailed_logs else logging.WARNING
+
 logging.basicConfig(
-    level=logging.INFO,
+    level=log_level,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout),
@@ -646,18 +650,18 @@ class SerialCommunicationServer:
                     'retention_seconds': self.DATA_RETENTION_SECONDS
                 }
                 self._send_to_client(client_socket, response)
-                logger.info(f"✅ Sent status_response for request {request_id}")
+                logger.info(f"Sent status_response for request {request_id}")
                 
             else:
                 # Unknown request type
-                logger.warning(f"❌ Unknown request type: {request_type}")
+                logger.warning(f"Unknown request type: {request_type}")
                 response = {
                     'type': 'error_response',
                     'request_id': request_id,
                     'error': f'Unknown request type: {request_type}'
                 }
                 self._send_to_client(client_socket, response)
-                logger.info(f"✅ Sent error_response for request {request_id}")
+                logger.info(f"Sent error_response for request {request_id}")
                 
         except json.JSONDecodeError as e:
             logger.warning(f"Invalid JSON from client {client_address}: {request_line}")
