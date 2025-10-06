@@ -332,7 +332,7 @@ class SensorCallbacks:
                          '<extra></extra>'
         ))
         
-        # Update layout for professional look
+        # Update layout for professional look with uirevision to preserve zoom/pan
         fig.update_layout(
             title=dict(
                 text=f"{sensor_name} - Live Data",
@@ -360,7 +360,8 @@ class SensorCallbacks:
             height=300,
             margin=dict(l=60, r=30, t=40, b=50),
             showlegend=False,
-            hovermode='x unified'
+            hovermode='x unified',
+            uirevision=f"{sensor_name}-main"  # Preserve zoom/pan state
         )
         
         return fig
@@ -390,7 +391,7 @@ class SensorCallbacks:
             align="center"
         )
         
-        # Update layout
+        # Update layout with uirevision to preserve zoom/pan
         fig.update_layout(
             title=dict(
                 text=f"{sensor_name} - Offline",
@@ -416,7 +417,8 @@ class SensorCallbacks:
             paper_bgcolor='white',
             height=300,
             margin=dict(l=60, r=30, t=40, b=50),
-            showlegend=False
+            showlegend=False,
+            uirevision=f"{sensor_name}-empty"  # Preserve zoom/pan state
         )
         
         return fig
@@ -500,7 +502,7 @@ class SensorCallbacks:
                          '<extra></extra>'
         ))
         
-        # Update layout for professional look
+        # Update layout for professional look with uirevision to preserve zoom/pan
         fig.update_layout(
             title=dict(
                 text=f"{sensor_name} - {field.title()}",
@@ -528,7 +530,8 @@ class SensorCallbacks:
             height=300,
             margin=dict(l=60, r=30, t=40, b=50),
             showlegend=False,
-            hovermode='x unified'
+            hovermode='x unified',
+            uirevision=f"{sensor_name}-{field}"  # Preserve zoom/pan state
         )
         
         return fig
@@ -557,7 +560,7 @@ class SensorCallbacks:
             align="center"
         )
         
-        # Update layout
+        # Update layout with uirevision to preserve zoom/pan
         fig.update_layout(
             title=dict(
                 text=f"{sensor_name} - {field.title()} (Offline)",
@@ -583,7 +586,8 @@ class SensorCallbacks:
             paper_bgcolor='white',
             height=300,
             margin=dict(l=60, r=30, t=40, b=50),
-            showlegend=False
+            showlegend=False,
+            uirevision=f"{sensor_name}-{field}-empty"  # Preserve zoom/pan state
         )
         
         return fig

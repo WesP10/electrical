@@ -486,10 +486,11 @@ class TCPCommunication(BaseCommunication):
         return self.connection_status
     
     def has_recent_data_for_sensor(self, sensor_name: str) -> bool:
-        """Check if sensor has recent data (within last 5 seconds)."""
+        """Check if sensor has recent data or is actively sending data."""
         logger.info(f"🔍 Checking recent data for sensor: {sensor_name}")
         logger.info(f"📋 Discovered sensors: {list(self.discovered_sensors.keys())}")
         
+        # First check if sensor was ever discovered
         if sensor_name not in self.discovered_sensors:
             logger.info(f"❌ Sensor {sensor_name} not in discovered sensors")
             return False
@@ -497,10 +498,23 @@ class TCPCommunication(BaseCommunication):
         current_time = time.time()
         last_seen = self.discovered_sensors[sensor_name]['last_seen']
         time_diff = current_time - last_seen
-        result = time_diff < 5.0  # 5 second timeout
         
-        logger.info(f"⏰ Sensor {sensor_name}: last_seen={last_seen}, current={current_time}, diff={time_diff:.2f}s, recent={result}")
-        return result
+        # Use longer timeout for discovered sensors (30 seconds instead of 5)
+        # This accounts for Arduino header messages being sent infrequently
+        discovery_timeout = 30.0
+        recent_discovery = time_diff < discovery_timeout
+        
+        logger.info(f"⏰ Sensor {sensor_name}: last_seen={last_seen}, current={current_time}, diff={time_diff:.2f}s")
+        logger.info(f"📊 Discovery recent: {recent_discovery} (timeout: {discovery_timeout}s)")
+        
+        if recent_discovery:
+            logger.info(f"✅ Sensor {sensor_name} has recent discovery data")
+            return True
+        else:
+            logger.info(f"⚠️ Sensor {sensor_name} discovery data is old, but may still be active")
+            # TODO: Could also check if server reports sensor as currently active
+            # For now, assume old discovered sensors are still valid if they were recently discovered
+            return time_diff < 300.0  # 5 minute absolute timeout
     
     def get_sensor_data_dataframe(self, sensor_name: str):
         """Get recent sensor data as pandas DataFrame."""
