@@ -91,7 +91,7 @@ class SensorService:
     """Service for managing sensors with dynamic discovery and watchdog timers."""
     
     # Watchdog timeout in seconds - sensor marked unavailable if no data received
-    WATCHDOG_TIMEOUT = 5.0
+    WATCHDOG_TIMEOUT = 3.0  # Reduced from 5.0 for faster disconnection detection
     
     def __init__(self, communication_service: CommunicationService):
         self.communication_service = communication_service
@@ -244,3 +244,21 @@ class SensorService:
         self._sensor_availability.clear()
         
         logger.info("Sensor service shutdown complete")
+    
+    def clear_all_sensors(self) -> None:
+        """Clear all sensors and their data (used when switching microcontrollers)."""
+        logger.info("Clearing all sensors for microcontroller switch...")
+        
+        # Deregister all sensor callbacks
+        for sensor_name in list(self._sensors.keys()):
+            try:
+                self.communication_service.deregister_data_callback(sensor_name)
+            except Exception as e:
+                logger.error(f"Error deregistering callback for {sensor_name}: {e}")
+        
+        # Clear all data structures
+        self._sensors.clear()
+        self._watchdog_timers.clear()
+        self._sensor_availability.clear()
+        
+        logger.info("All sensors cleared successfully")

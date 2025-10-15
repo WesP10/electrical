@@ -38,12 +38,13 @@ class SensorCallbacks:
             [Output('sensor-grid', 'children'),
              Output('sensor-summary-card', 'children')],
             [Input('sensor-update-interval', 'n_intervals'),
-             Input('sensor-dropdown', 'value')]
+             Input('sensor-dropdown', 'value'),
+             Input('sensor-refresh-trigger', 'data')]
         )
-        def update_sensor_data(n_intervals, selected_sensors):
-            """Update sensor data periodically."""
+        def update_sensor_data(n_intervals, selected_sensors, refresh_trigger):
+            """Update sensor data periodically and when microcontroller changes."""
             try:
-                logger.info(f"Callback triggered: interval={n_intervals}, sensors={selected_sensors}")
+                logger.info(f"Callback triggered: interval={n_intervals}, sensors={selected_sensors}, refresh={refresh_trigger}")
                 
                 # Get TCP communication service directly
                 from services.tcp_communication_service import CommunicationService

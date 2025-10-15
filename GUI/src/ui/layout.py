@@ -118,6 +118,7 @@ class MainLayout:
             from ui.callbacks.main_callbacks import MainCallbacks
             from ui.callbacks.sensor_callbacks import SensorCallbacks
             from ui.callbacks.profile_callbacks import ProfileCallbacks
+            from ui.callbacks.navigation_callbacks import NavigationBarCallbacks
             
             # Register main callbacks with pages
             main_callbacks = MainCallbacks(self.pages, self.default_page)
@@ -130,6 +131,10 @@ class MainLayout:
             # Register profile callbacks
             profile_callbacks = ProfileCallbacks()
             profile_callbacks.register(app)
+            
+            # Register navigation bar callbacks
+            nav_callbacks = NavigationBarCallbacks()
+            nav_callbacks.register_callbacks(app)
             
             logger.info("Callbacks registered successfully")
             

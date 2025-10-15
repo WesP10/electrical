@@ -31,7 +31,7 @@ The launcher will automatically:
 -  **Start the dashboard** at `http://localhost:8050`
 -  **Use mock data** if no hardware is detected
 
-**See `GUI/SIMPLE_SETUP.md` for detailed setup guide and advanced options.**
+**Having issues? See `GUI/SETUP_TROUBLESHOOTING.md` for solutions to common problems.**
 
 ### Alternative: Docker Deployment
 For containerized deployment or isolated environments:
@@ -138,11 +138,16 @@ The repository has been reorganized into a clean, scalable structure with four m
 
 ## Getting Help
 
-1. **Quick Setup**: See `GUI/SIMPLE_SETUP.md` for one-command setup and troubleshooting
-2. **Current Development**: Check `GUI/README.md` for detailed development guides
-3. **Architecture Questions**: Review `documentation/` for system diagrams and specs
-4. **Legacy Reference**: Browse `depreciated/` for historical implementations
-5. **Team Communication**: Contact team leads for project-specific questions
+### Setup Issues
+1. **Import Errors**: Run `python GUI/verify_setup.py` to diagnose issues
+2. **Common Problems**: See `GUI/SETUP_TROUBLESHOOTING.md` for solutions
+3. **Serial Issues**: Check for pyserial vs serial package conflicts
+
+### Development
+1. **Current Development**: Check `GUI/README.md` for detailed development guides
+2. **Architecture Questions**: Review `documentation/` for system diagrams and specs
+3. **Legacy Reference**: Browse `depreciated/` for historical implementations
+4. **Team Communication**: Contact team leads for project-specific questions
 
 ## Contributing
 

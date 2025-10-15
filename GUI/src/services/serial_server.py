@@ -350,6 +350,42 @@ class SerialCommunicationServer:
         
         logger.info("Data cleanup thread stopped")
     
+    def _reconfigure_serial_connection(self, new_port: str, new_baud_rate: int) -> bool:
+        """Reconfigure the serial connection with new port and baud rate."""
+        try:
+            logger.info(f"Reconfiguring serial connection: {new_port} at {new_baud_rate} baud")
+            
+            # Close existing connection
+            if self.serial_conn and self.serial_conn.is_open:
+                try:
+                    self.serial_conn.close()
+                    logger.info("Closed existing serial connection")
+                except Exception as e:
+                    logger.warning(f"Error closing existing connection: {e}")
+            
+            # Update configuration
+            self.serial_port = new_port
+            self.baudrate = new_baud_rate
+            
+            # Clear discovered sensors for new microcontroller
+            self.discovered_sensors.clear()
+            logger.info("Cleared discovered sensors for new microcontroller")
+            
+            # Attempt new connection
+            self._connect_serial()
+            
+            # Check if connection succeeded
+            if self.serial_conn and self.serial_conn.is_open:
+                logger.info(f"Successfully reconfigured to {new_port} at {new_baud_rate} baud")
+                return True
+            else:
+                logger.error("Failed to establish new serial connection")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error reconfiguring serial connection: {e}")
+            return False
+    
     def _parse_header(self, header_line):
         """Parse header format and return sensor info."""
         try:
@@ -652,6 +688,25 @@ class SerialCommunicationServer:
                 self._send_to_client(client_socket, response)
                 logger.info(f"Sent status_response for request {request_id}")
                 
+            elif request_type == 'reconfigure_connection':
+                # Reconfigure serial connection with new port/baud rate
+                new_port = request.get('port')
+                new_baud_rate = request.get('baud_rate')
+                
+                logger.info(f"Received reconfiguration request: {new_port} at {new_baud_rate} baud")
+                success = self._reconfigure_serial_connection(new_port, new_baud_rate)
+                
+                response = {
+                    'type': 'reconfigure_response',
+                    'request_id': request_id,
+                    'success': success,
+                    'port': self.serial_port,
+                    'baud_rate': self.baudrate,
+                    'connected': self.serial_conn and self.serial_conn.is_open if success else False
+                }
+                self._send_to_client(client_socket, response)
+                logger.info(f"Sent reconfigure_response for request {request_id}: success={success}")
+                
             else:
                 # Unknown request type
                 logger.warning(f"Unknown request type: {request_type}")
@@ -696,6 +751,86 @@ class SerialCommunicationServer:
         # Sort by timestamp (should already be sorted, but just to be sure)
         result.sort(key=lambda x: x['timestamp'])
         return result
+    
+    def _reconfigure_serial_connection(self, new_port: str, new_baud_rate: int) -> bool:
+        """Reconfigure the serial connection with new port and baud rate."""
+        try:
+            logger.info(f"Reconfiguring serial connection: {new_port} at {new_baud_rate} baud")
+            
+            # Close existing connection
+            if self.serial_conn and self.serial_conn.is_open:
+                logger.info("Closing existing serial connection")
+                self.serial_conn.close()
+                time.sleep(1)  # Give time for port to be released
+            
+            # Update connection parameters
+            old_port = self.serial_port
+            old_baud_rate = self.baudrate
+            
+            self.serial_port = new_port
+            self.baudrate = new_baud_rate
+            
+            # Test new connection
+            try:
+                logger.info(f"Testing new connection: {new_port} at {new_baud_rate} baud")
+                test_conn = serial.Serial(
+                    port=new_port,
+                    baudrate=new_baud_rate,
+                    timeout=1.0,
+                    bytesize=serial.EIGHTBITS,
+                    parity=serial.PARITY_NONE,
+                    stopbits=serial.STOPBITS_ONE,
+                    exclusive=True
+                )
+                test_conn.close()
+                
+                # If test successful, establish real connection
+                logger.info("Test connection successful, establishing real connection")
+                self._connect_serial()
+                
+                if self.serial_conn and self.serial_conn.is_open:
+                    logger.info(f"Successfully reconfigured to {new_port} at {new_baud_rate} baud")
+                    
+                    # Broadcast configuration change to all clients
+                    self._broadcast_to_clients({
+                        'type': 'connection_reconfigured',
+                        'old_port': old_port,
+                        'old_baud_rate': old_baud_rate,
+                        'new_port': new_port,
+                        'new_baud_rate': new_baud_rate,
+                        'success': True
+                    })
+                    
+                    return True
+                else:
+                    logger.error("Failed to establish connection after successful test")
+                    return False
+                    
+            except serial.SerialException as e:
+                logger.error(f"Failed to connect to {new_port}: {e}")
+                
+                # Revert to old settings
+                logger.info(f"Reverting to previous settings: {old_port} at {old_baud_rate} baud")
+                self.serial_port = old_port
+                self.baudrate = old_baud_rate
+                self._connect_serial()
+                
+                # Broadcast failure to all clients
+                self._broadcast_to_clients({
+                    'type': 'connection_reconfigured',
+                    'old_port': old_port,
+                    'old_baud_rate': old_baud_rate,
+                    'new_port': new_port,
+                    'new_baud_rate': new_baud_rate,
+                    'success': False,
+                    'error': str(e)
+                })
+                
+                return False
+                
+        except Exception as e:
+            logger.error(f"Unexpected error during reconfiguration: {e}")
+            return False
 
 
 def detect_arduino_port():
