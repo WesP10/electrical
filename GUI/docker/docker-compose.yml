@@ -10,9 +10,7 @@ services:
       - DASH_HOST=0.0.0.0
       - DASH_PORT=8050
       - DASH_DEBUG=false
-    volumes:
-      # Mount for development (optional - remove for production)
-      - ..:/app
+      - USE_MOCK_COMMUNICATION=true
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8050"]

@@ -37,10 +37,11 @@ ENV DASH_HOST=0.0.0.0
 ENV DASH_PORT=8050
 ENV DASH_DEBUG=False
 ENV PYTHONPATH=/app
+ENV USE_MOCK_COMMUNICATION=true
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8050 || exit 1
 
 # Run the application
-CMD ["python", "app.py"]
+CMD ["python", "src/app.py"]
