@@ -52,6 +52,9 @@ The following files were removed during the cleanup:
 - `config/launcher.py` - Python launcher
 - `config/run.ps1` - PowerShell launcher
 - `config/run.bat` - Batch launcher
+- `config/run.sh` - Shell launcher script
+- `serial_server.log` - Old log file
+- `**/__pycache__/` - Python bytecode cache directories
 
 ## Key Changes
 1. **Single Entry Point**: Only `src/app.py` is used
