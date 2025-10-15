@@ -15,39 +15,66 @@ This repository contains the electrical team's code, documentation, and resource
 
 ## Quick Start
 
-### For New Team Members (Launcher - Recommended)
-**One-command setup with automatic hardware detection:**
+### For New Team Members (Docker - Recommended)
+**One-command setup with containerized deployment:**
 
 ```bash
 cd GUI
-python run.py
+docker-compose -f docker/docker-compose.yml up --build
 ```
 
-The launcher will automatically:
--  **Detect your operating system** (Windows/macOS/Linux)
--  **Scan for connected microcontrollers** (Arduino, ESP32, etc.)
--  **Choose optimal launcher script** (PowerShell/Batch/Shell)
--  **Set up centralized Python cache** (organized `__pycache__`)
+The Docker deployment will automatically:
+-  **Build the container** with all dependencies
+-  **Set up the environment** with proper configuration
 -  **Start the dashboard** at `http://localhost:8050`
--  **Use mock data** if no hardware is detected
+-  **Use mock data** (no hardware detection needed in containers)
+-  **Work on any platform** (Windows/macOS/Linux)
 
-**Having issues? See `GUI/SETUP_TROUBLESHOOTING.md` for solutions to common problems.**
+**Having issues? Check the troubleshooting section below or contact the team leads.**
 
-### Alternative: Docker Deployment
+### Docker Deployment (Recommended for Production)
+**Single entry point:** `src/app.py`
+
 For containerized deployment or isolated environments:
 
 ```bash
-cd GUI/docker
-./start.bat     # Windows
-./start.sh      # macOS/Linux
+# Production mode
+cd GUI
+docker-compose -f docker/docker-compose.yml up --build
+
+# Development mode (with hot reload)
+docker-compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up --build
 ```
 
-This will:
-- Build the Docker container
-- Install all dependencies
-- Start the dashboard at `http://localhost:8050`
+**Manual Docker Commands:**
+```bash
+# Build the image
+cd GUI
+docker build -f docker/Dockerfile -t hyperloop-gui .
 
-**See `GUI/docker/README.md` for detailed Docker setup guide.**
+# Run the container
+docker run -p 8050:8050 hyperloop-gui
+```
+
+**Docker Environment Variables:**
+- `DASH_HOST`: Host to bind to (default: 0.0.0.0)
+- `DASH_PORT`: Port to bind to (default: 8050)
+- `DASH_DEBUG`: Enable debug mode (default: false)
+- `USE_MOCK_COMMUNICATION`: Always true (hardware detection removed)
+- `PYTHONPATH`: Set to /app in Docker
+
+**Command Line Options:**
+```bash
+python src/app.py [options]
+
+Options:
+  --debug          Enable debug mode (default: True)
+  --no-debug       Disable debug mode
+  --host HOST      Host to bind to (default: 0.0.0.0)
+  --port PORT      Port to bind to (default: 8050)
+  --test           Run tests instead of application
+  -h, --help       Show help message
+```
 
 ### Legacy: Manual Python Setup
 ```bash
@@ -156,6 +183,26 @@ The repository has been reorganized into a clean, scalable structure with four m
 3. **Testing**: Add tests for new functionality
 4. **Legacy Code**: Do not modify code in `depreciated/` or `archived_resources/`
 
+## Docker Deployment Notes
+
+The GUI has been optimized for Docker deployment with the following changes:
+
+**Key Docker Changes:**
+1. **Single Entry Point**: Only `src/app.py` is used (no complex launchers in Docker)
+2. **No Device Detection**: Mock communication is the default in containers
+3. **Docker-First**: Optimized for containerized deployment
+4. **Simplified Configuration**: Environment variable driven
+5. **No OS Detection**: Works on any platform via Docker
+
+**Removed Files (Docker Cleanup):**
+- `run.py` - Complex intelligent launcher (replaced by Docker entry point)
+- `config/launcher.py` - Python launcher
+- `config/run.ps1` - PowerShell launcher
+- `config/run.bat` - Batch launcher
+- `config/run.sh` - Shell launcher script
+- `serial_server.log` - Old log file
+- `**/__pycache__/` - Python bytecode cache directories
+
 ## Migration Notes
 
 This repository was restructured in October 2025 to improve maintainability and scalability:
@@ -164,8 +211,8 @@ This repository was restructured in October 2025 to improve maintainability and 
 - **Preserved Legacy**: Old implementations moved to depreciated/ for reference
 - **Organized Documentation**: Centralized in documentation/ folder
 - **Archived Resources**: Historical web interfaces preserved in archived_resources/
-- **Simplified Setup**: Added intelligent launcher system (`run.py`) for one-command setup
-- **Centralized Config**: Moved configuration files to `config/` directory with automatic path resolution
+- **Docker Optimization**: Simplified entry point system for containerized deployment
+- **Centralized Config**: Essential configuration files in `config/` directory
 
 For questions about the restructuring or location of specific files, please contact the electrical team leads.
 
