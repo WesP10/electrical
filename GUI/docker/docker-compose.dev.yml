@@ -5,4 +5,4 @@ services:
     volumes:
       - ..:/app
       - /app/__pycache__  # Exclude pycache from mounting
-    command: python app.py --reload
+    command: python src/app.py --debug
