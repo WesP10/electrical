@@ -11,9 +11,7 @@ from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 import time
 
-# Add GUI directory to path for config package imports
-gui_dir = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(gui_dir))
+# Use PYTHONPATH for imports
 from config.log_config import get_logger
 
 logger = get_logger(__name__)
@@ -147,9 +145,7 @@ class PortDetector:
     @classmethod
     def get_port_options_for_dropdown(cls) -> List[Dict]:
         """Get port options formatted for Dash dropdown."""
-        options = [
-            {'label': 'Mock Mode (Simulated Data)', 'value': 'mock'}
-        ]
+        options = []
         
         microcontroller_ports = cls.get_microcontroller_ports()
         if microcontroller_ports:

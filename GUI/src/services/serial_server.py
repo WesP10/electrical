@@ -36,7 +36,8 @@ except ImportError:
 
 # Configure logging
 enable_detailed_logs = os.environ.get("ENABLE_DETAILED_LOGS", "false").lower() == "true"
-log_level = logging.INFO if enable_detailed_logs else logging.WARNING
+# Show INFO level by default so users can see connection status
+log_level = logging.INFO if enable_detailed_logs else logging.INFO
 
 logging.basicConfig(
     level=log_level,
@@ -102,6 +103,14 @@ class SerialCommunicationServer:
     def start(self):
         """Start serial communication, TCP server, and cleanup thread."""
         logger.info("Starting Passive Serial Communication Server...")
+        
+        # Establish initial serial connection before starting threads
+        logger.info("Establishing initial serial connection...")
+        self._connect_serial()
+        
+        if not self.serial_conn or not self.serial_conn.is_open:
+            logger.error("Failed to establish initial serial connection")
+            raise RuntimeError(f"Could not connect to serial port {self.serial_port}")
         
         # Start buffer cleanup thread
         self.cleanup_running = True
@@ -174,14 +183,26 @@ class SerialCommunicationServer:
                 stopbits=serial.STOPBITS_ONE,
                 exclusive=True  # Exclusive access to prevent conflicts
             )
-            # Wait for Arduino to reset
-            time.sleep(2)
+            
+            # Verify connection was successful
+            if not self.serial_conn.is_open:
+                logger.error("Serial port failed to open")
+                self.serial_conn = None
+                return
+                
+            # Wait longer for Arduino to reset and stabilize
+            logger.info("Waiting for Arduino to reset and stabilize...")
+            time.sleep(3)  # Increased from 2 to 3 seconds
+            
+            # Verify connection is still open after reset delay
+            if not self.serial_conn.is_open:
+                logger.error("Serial connection lost during Arduino reset")
+                self.serial_conn = None
+                return
+                
             # Clear startup noise
             self.serial_conn.reset_input_buffer()
-            logger.info(f"Successfully connected to {self.serial_port}")
-            
-            # Log connection status
-            logger.info(f"Connected to {self.serial_port} at {self.baudrate} baud")
+            logger.info(f"Successfully connected to {self.serial_port} at {self.baudrate} baud")
             self._broadcast_to_clients({
                 'type': 'connection_status',
                 'connected': True,
@@ -190,12 +211,18 @@ class SerialCommunicationServer:
             })
             
         except serial.SerialException as e:
-            logger.error(f"Failed to connect to serial port {self.serial_port}: {e}")
+            error_msg = str(e)
+            if "PermissionError" in error_msg or "functioning" in error_msg:
+                logger.error(f"Hardware/Permission issue with {self.serial_port}: {e}")
+                logger.error("Possible solutions: 1) Close Arduino IDE Serial Monitor, 2) Unplug/replug Arduino, 3) Check drivers")
+            else:
+                logger.error(f"Failed to connect to serial port {self.serial_port}: {e}")
             self.serial_conn = None
             # Notify clients about connection failure
             self._broadcast_to_clients({
                 'type': 'connection_status',
                 'connected': False,
+                'port': self.serial_port,
                 'error': str(e)
             })
         except Exception as e:
@@ -204,7 +231,7 @@ class SerialCommunicationServer:
     
     def _serial_loop(self):
         """Main serial reading loop."""
-        logger.info("Serial read loop started")
+        logger.info("Serial read loop started with existing connection")
         
         while self.serial_running:
             # Check if connected
@@ -212,7 +239,11 @@ class SerialCommunicationServer:
                 logger.warning("Serial connection lost, attempting to reconnect...")
                 time.sleep(2)
                 self._connect_serial()
-                continue
+                # After reconnection attempt, check if it actually succeeded
+                if not self.serial_conn or not self.serial_conn.is_open:
+                    logger.debug("Reconnection failed, retrying in 5 seconds...")
+                    time.sleep(5)
+                    continue
             
             try:
                 # Read until newline character
@@ -833,32 +864,115 @@ class SerialCommunicationServer:
             return False
 
 
-def detect_arduino_port():
-    """Detect Arduino COM port automatically."""
+def detect_microcontroller_ports():
+    """Universal microcontroller port detection across all platforms."""
     try:
         import serial.tools.list_ports
     except ImportError:
         print("ERROR: pyserial not installed. Run: pip install pyserial")
-        return None
+        return []
+    
+    detected_ports = []
     
     for port in serial.tools.list_ports.comports():
-        # Look for Arduino identifiers
-        if any(identifier in port.description.lower() for identifier in ['arduino', 'ch340', 'cp210', 'ftdi']):
-            logger.info(f"Found Arduino on {port.device}: {port.description}")
-            return port.device
+        port_info = {
+            'device': port.device,
+            'description': port.description or 'Unknown device',
+            'manufacturer': port.manufacturer or 'Unknown',
+            'vid': port.vid,
+            'pid': port.pid,
+            'confidence': 0  # Confidence score for Arduino detection
+        }
+        
+        # Arduino/microcontroller detection patterns
+        description_lower = port_info['description'].lower()
+        manufacturer_lower = port_info['manufacturer'].lower()
+        
+        # High confidence matches (specific Arduino VID/PID)
+        arduino_vids = [0x2341, 0x1A86, 0x10C4, 0x0403]  # Arduino, CH340, CP210x, FTDI
+        if port.vid in arduino_vids:
+            port_info['confidence'] = 90
+            
+        # High confidence based on description
+        elif any(keyword in description_lower for keyword in [
+            'arduino uno', 'arduino nano', 'arduino mega', 'arduino leonardo',
+            'esp32', 'esp8266', 'nodemcu', 'wemos'
+        ]):
+            port_info['confidence'] = 85
+            
+        # Medium confidence based on chip identifiers
+        elif any(keyword in description_lower for keyword in [
+            'ch340', 'ch341', 'cp210', 'cp2102', 'ftdi', 'ft232'
+        ]):
+            port_info['confidence'] = 70
+            
+        # Low confidence based on generic Arduino terms
+        elif any(keyword in description_lower for keyword in [
+            'arduino', 'usb serial', 'usb-serial', 'serial converter'
+        ]):
+            port_info['confidence'] = 50
+            
+        # Medium confidence for known manufacturers
+        elif any(keyword in manufacturer_lower for keyword in [
+            'arduino', 'espressif', 'wch', 'silicon labs', 'ftdi'
+        ]):
+            port_info['confidence'] = 60
+        
+        # Add port if it has any confidence or is a generic serial port
+        if port_info['confidence'] > 0 or 'serial' in description_lower:
+            detected_ports.append(port_info)
     
-    # Also check specific COM ports commonly used by Arduino
-    for port_num in range(1, 20):
-        port_name = f"COM{port_num}"
-        try:
-            test_serial = serial.Serial(port_name, timeout=1)
-            test_serial.close()
-            logger.info(f"Found available serial port: {port_name}")
-            return port_name
-        except:
-            continue
+    # Sort by confidence (highest first), then by device name
+    detected_ports.sort(key=lambda p: (-p['confidence'], p['device']))
     
-    return None
+    return detected_ports
+
+
+def select_serial_port(interactive=False):
+    """Select serial port with auto-detection and optional interactive selection."""
+    detected_ports = detect_microcontroller_ports()
+    
+    if not detected_ports:
+        print("No serial ports detected.")
+        print("Make sure your Arduino/microcontroller is connected and drivers are installed.")
+        return None
+    
+    print(f"Found {len(detected_ports)} serial device(s):")
+    for i, port in enumerate(detected_ports, 1):
+        confidence_level = "HIGH" if port['confidence'] >= 70 else "MED" if port['confidence'] >= 50 else "LOW"
+        print(f"   [{i}] {port['device']} - {port['description']} ({confidence_level})")
+        if port['manufacturer'] != 'Unknown':
+            print(f"       Manufacturer: {port['manufacturer']}")
+    
+    # Auto-select highest confidence port if not interactive
+    if not interactive and detected_ports:
+        selected_port = detected_ports[0]
+        confidence_level = "High" if selected_port['confidence'] >= 70 else "Medium" if selected_port['confidence'] >= 50 else "Low"
+        print(f"Auto-selected: {selected_port['device']} ({confidence_level} confidence)")
+        return selected_port['device']
+    
+    # Interactive selection
+    print(f"\nEnter port number [1-{len(detected_ports)}] or press Enter for auto-select:")
+    try:
+        user_input = input().strip()
+        
+        if not user_input:  # Auto-select
+            selected_port = detected_ports[0]
+            print(f"Auto-selected: {selected_port['device']}")
+            return selected_port['device']
+        
+        port_index = int(user_input) - 1
+        if 0 <= port_index < len(detected_ports):
+            selected_port = detected_ports[port_index]
+            print(f"Selected: {selected_port['device']}")
+            return selected_port['device']
+        else:
+            print(f"Invalid selection. Please enter 1-{len(detected_ports)}")
+            return None
+            
+    except (ValueError, KeyboardInterrupt):
+        print("Invalid input or cancelled.")
+        return None
 
 
 def signal_handler(signum, frame):
@@ -872,22 +986,24 @@ def signal_handler(signum, frame):
 def main():
     """Main entry point for the serial server."""
     parser = argparse.ArgumentParser(description="Serial Communication Server")
-    parser.add_argument("--port", help="Serial port (e.g., COM6)")
+    parser.add_argument("--port", help="Serial port (e.g., COM6, /dev/ttyUSB0)")
     parser.add_argument("--baudrate", type=int, default=115200, help="Serial baudrate")
     parser.add_argument("--tcp-port", type=int, default=9999, help="TCP server port")
-    parser.add_argument("--auto-detect", action="store_true", help="Auto-detect Arduino port")
+    parser.add_argument("--auto-detect", action="store_true", help="Auto-detect microcontroller port (default if no --port specified)")
+    parser.add_argument("--interactive", action="store_true", help="Interactive port selection from detected devices")
     
     args = parser.parse_args()
     
     # Determine serial port
     serial_port = args.port
-    if args.auto_detect or not serial_port:
-        detected_port = detect_arduino_port()
+    if args.auto_detect or args.interactive or not serial_port:
+        print("Detecting microcontroller ports...")
+        detected_port = select_serial_port(interactive=args.interactive)
         if detected_port:
             serial_port = detected_port
-            logger.info(f"Auto-detected Arduino on {serial_port}")
+            logger.info(f"Selected serial port: {serial_port}")
         else:
-            logger.error("No Arduino found. Please specify --port manually.")
+            logger.error("No serial port selected. Please specify --port manually.")
             sys.exit(1)
     
     # Set up signal handlers
@@ -899,17 +1015,23 @@ def main():
     server = SerialCommunicationServer(serial_port, args.baudrate, args.tcp_port)
     
     try:
+        logger.info("Initializing serial communication server...")
         server.start()
         
         # Keep main thread alive
         logger.info("Serial Communication Server is running. Press Ctrl+C to stop.")
+        print("Server is running... Press Ctrl+C to stop.")
         while True:
             time.sleep(1)
             
     except KeyboardInterrupt:
         logger.info("Shutting down on user request...")
+        print("Shutting down...")
     except Exception as e:
         logger.error(f"Server error: {e}")
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         server.stop()
 

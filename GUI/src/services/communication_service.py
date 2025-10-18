@@ -13,9 +13,7 @@ import serial
 import sys
 from pathlib import Path
 
-# Add GUI directory to path for config package imports
-gui_dir = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(gui_dir))
+# Use PYTHONPATH for imports
 from config.log_config import get_logger
 
 logger = get_logger(__name__)
@@ -351,7 +349,7 @@ class PySerialCommunication(BaseCommunication):
 
 class CommunicationService:
     """
-    High-level communication service that manages serial or mock communication.
+    High-level communication service that manages serial communication.
     This is the main interface used by the application.
     """
     
@@ -360,47 +358,59 @@ class CommunicationService:
         Initialize the communication service.
         
         Args:
-            config: CommunicationConfig object with port, baudrate, timeout, use_mock
+            config: CommunicationConfig object with port, baudrate, timeout
         """
         self.config = config
         self.comm = None
         
-        # Choose implementation based on config
-        if config.use_mock or config.port == 'loop://' or config.port.startswith('mock'):
-            logger.info("Using MockCommunication (simulated sensor data)")
-            from sensors.mock_communication import MockCommunication
-            self.comm = MockCommunication()
-        else:
+        # Only use real serial communication
+        if config.port and config.port != 'none':
             logger.info(f"Using PySerialCommunication on port {config.port}")
             self.comm = PySerialCommunication(
                 port=config.port,
                 baudrate=config.baudrate,
                 timeout=config.timeout / 1000.0  # Convert ms to seconds
             )
-        
-        # Start communication
-        self.comm.start()
-        logger.info("Communication service initialized and started")
+            # Start communication
+            self.comm.start()
+            logger.info("Communication service initialized and started")
+        else:
+            logger.info("No serial port configured - communication service disabled")
+            self.comm = None
     
     def set_discovery_callback(self, callback):
         """Set callback for sensor discovery."""
-        return self.comm.set_discovery_callback(callback)
+        if self.comm:
+            return self.comm.set_discovery_callback(callback)
+        return False
     
     def register_data_callback(self, sensor_name, callback):
         """Register callback for sensor data."""
-        return self.comm.register_data_callback(sensor_name, callback)
+        if self.comm:
+            return self.comm.register_data_callback(sensor_name, callback)
+        return False
     
     def deregister_data_callback(self, sensor_name):
         """Deregister callback for sensor data."""
-        return self.comm.deregister_data_callback(sensor_name)
+        if self.comm:
+            return self.comm.deregister_data_callback(sensor_name)
+        return False
     
     def get_discovered_sensors(self):
         """Get list of discovered sensor names."""
-        return self.comm.get_discovered_sensors()
+        if self.comm:
+            return self.comm.get_discovered_sensors()
+        return []
     
     def get_buffer_lines(self, n=10):
         """Get the last n lines from the buffer."""
-        return self.comm.get_buffer_lines(n)
+        if self.comm:
+            return self.comm.get_buffer_lines(n)
+        return []
+    
+    def is_connected(self):
+        """Check if communication is active."""
+        return self.comm is not None and hasattr(self.comm, 'is_connected') and self.comm.is_connected()
     
     def close(self):
         """Close and cleanup the communication service."""

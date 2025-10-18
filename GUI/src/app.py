@@ -4,18 +4,9 @@
 import os
 import sys
 import argparse
-from pathlib import Path
 from typing import Optional
 
-# Add GUI directory to path for config package imports
-current_file = Path(__file__).resolve()
-src_dir = current_file.parent
-gui_dir = src_dir.parent
-
-sys.path.insert(0, str(src_dir))
-sys.path.insert(0, str(gui_dir))
-
-# Set up centralized cache directory
+# Set up environment (Docker-friendly, no hardcoded paths)
 from config.environment import setup_environment
 setup_environment()
 

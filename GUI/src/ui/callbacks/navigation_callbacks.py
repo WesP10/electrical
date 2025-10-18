@@ -46,10 +46,7 @@ from dash import callback, Input, Output, State, no_update, ctx, html, dcc
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
-# Add GUI directory to path for imports
-gui_dir = Path(__file__).parent.parent.parent.parent
-sys.path.insert(0, str(gui_dir))
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Use PYTHONPATH for imports
 
 from config.log_config import get_logger
 from utils.port_detection import (
@@ -74,6 +71,7 @@ class NavigationBarCallbacks:
     
     def register_callbacks(self, app):
         """Register all navigation bar callbacks with the Dash app."""
+        logger.info("REGISTERING NAVIGATION BAR CALLBACKS...")
         
         @app.callback(
             [Output('port-selection-dropdown', 'options'),
@@ -83,6 +81,7 @@ class NavigationBarCallbacks:
         )
         def update_dropdown_options(refresh_clicks):
             """Update dropdown options when page loads or refresh is clicked."""
+            logger.info(f"DROPDOWN CALLBACK TRIGGERED - refresh_clicks: {refresh_clicks}")
             try:
                 # Implement cooldown to prevent excessive refreshing
                 current_time = time.time()
@@ -96,15 +95,20 @@ class NavigationBarCallbacks:
                     logger.info("Refreshing port and baud rate options")
                 
                 # Get current port and baud rate options
+                logger.info("Getting port dropdown options...")
                 port_options = get_port_dropdown_options()
+                logger.info("Getting baud rate dropdown options...")
                 baud_rate_options = get_baud_rate_dropdown_options()
                 
-                logger.info(f"Loaded {len(port_options)} port options and {len(baud_rate_options)} baud rate options")
+                logger.info(f"DROPDOWN UPDATE SUCCESS: {len(port_options)} port options and {len(baud_rate_options)} baud rate options")
+                logger.info(f"Port options: {port_options}")
                 
                 return port_options, baud_rate_options
                 
             except Exception as e:
                 logger.error(f"Error updating dropdown options: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
                 # Return empty options on error
                 return [], []
         
@@ -124,7 +128,7 @@ class NavigationBarCallbacks:
             
             try:
                 # If no current selection, try to auto-detect
-                if not current_port or current_port == "mock":
+                if not current_port:
                     detected = auto_detect_microcontroller()
                     if detected:
                         detected_port, detected_baud = detected
@@ -138,12 +142,12 @@ class NavigationBarCallbacks:
                         
                         return detected_port, detected_baud, status_children
                     else:
-                        logger.info("No microcontroller detected, using mock mode")
+                        logger.info("No microcontroller detected")
                         status_children = [
-                            html.I(className="fas fa-circle text-warning me-1"), 
-                            html.Span("Mock Mode")
+                            html.I(className="fas fa-circle text-secondary me-1"), 
+                            html.Span("No Hardware")
                         ]
-                        return "mock", current_baud or 115200, status_children
+                        return None, current_baud or 115200, status_children
                 
                 return no_update, no_update, no_update
                 
@@ -171,33 +175,18 @@ class NavigationBarCallbacks:
                 try:
                     logger.info(f"Connection change requested: {selected_port} at {selected_baud} baud")
                     
-                    # Update connection based on selection
-                    if selected_port == "mock":
-                        # Switch to mock mode
-                        success = self._switch_to_mock_mode()
-                        if success:
-                            return (
-                                "fas fa-circle text-warning", 
-                                "Mock Mode"
-                            )
-                        else:
-                            return (
-                                "fas fa-circle text-danger",
-                                "Error"
-                            )
+                    # Update connection to hardware
+                    success = self._switch_to_hardware_mode(selected_port, selected_baud)
+                    if success:
+                        return (
+                            "fas fa-circle text-success",
+                            f"Connected to {selected_port}"
+                        )
                     else:
-                        # Switch to hardware mode
-                        success = self._switch_to_hardware_mode(selected_port, selected_baud)
-                        if success:
-                            return (
-                                "fas fa-circle text-success",
-                                f"Connected to {selected_port}"
-                            )
-                        else:
-                            return (
-                                "fas fa-circle text-danger",
-                                f"Failed to connect to {selected_port}"
-                            )
+                        return (
+                            "fas fa-circle text-danger",
+                            f"Failed to connect to {selected_port}"
+                        )
                             
                 except Exception as e:
                     logger.error(f"Error handling connection change: {e}")
@@ -242,35 +231,7 @@ class NavigationBarCallbacks:
                 return None
         return self.communication_service
     
-    def _switch_to_mock_mode(self) -> bool:
-        """Switch communication service to mock mode."""
-        try:
-            logger.info("Switching to mock communication mode")
-            
-            # Clear existing sensors when switching modes
-            self._clear_sensors_for_mode_switch()
-            
-            # Get communication service and switch to mock mode
-            comm_service = self._get_communication_service()
-            if comm_service:
-                success = comm_service.switch_to_mock_mode()
-                if success:
-                    logger.info("Successfully switched to mock mode")
-                    return True
-                else:
-                    logger.error("Communication service failed to switch to mock mode")
-                    return False
-            else:
-                # Fallback: just set environment variables
-                os.environ["USE_MOCK_COMMUNICATION"] = "true"
-                os.environ["SERIAL_SERVER_MODE"] = "false"
-                logger.warning("Communication service not available, using environment variables")
-                return True
-            
-        except Exception as e:
-            logger.error(f"Error switching to mock mode: {e}")
-            return False
-    
+
     def _switch_to_hardware_mode(self, port: str, baud_rate: int) -> bool:
         """Switch communication service to hardware mode with specified port and baud rate."""
         try:
@@ -301,7 +262,6 @@ class NavigationBarCallbacks:
                     return False
             else:
                 # Fallback: just set environment variables
-                os.environ["USE_MOCK_COMMUNICATION"] = "false"
                 os.environ["SERIAL_SERVER_MODE"] = "true"
                 os.environ["SERIAL_PORT"] = port
                 os.environ["SERIAL_BAUD_RATE"] = str(baud_rate)
@@ -327,14 +287,7 @@ class NavigationBarCallbacks:
             # Get current mode information
             mode_info = comm_service.get_current_mode()
             
-            if mode_info.get('is_mock', False):
-                return (
-                    "fas fa-circle text-warning",
-                    "Mock Mode",
-                    "warning", 
-                    "Mock"
-                )
-            elif mode_info.get('connected', False):
+            if mode_info.get('connected', False):
                 port = mode_info.get('port', 'Unknown')
                 return (
                     "fas fa-circle text-success",
@@ -382,8 +335,8 @@ class NavigationBarCallbacks:
             logger.info(f"Starting serial server for {port} at {baud_rate} baud")
             
             # Path to the serial server script
-            gui_dir = Path(__file__).parent.parent.parent.parent
-            server_script = gui_dir / "src" / "services" / "serial_server.py"
+            from services.serial_server import __file__ as server_file
+            server_script = Path(server_file)
             
             if not server_script.exists():
                 logger.error(f"Serial server script not found: {server_script}")
@@ -401,7 +354,7 @@ class NavigationBarCallbacks:
             logger.info(f"Starting server with command: {' '.join(cmd)}")
             process = subprocess.Popen(
                 cmd,
-                cwd=gui_dir,
+                cwd=server_script.parent.parent.parent,  # Navigate to project root
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 universal_newlines=True,

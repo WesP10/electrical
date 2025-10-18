@@ -3,15 +3,7 @@ from dash import dcc, html
 import dash_bootstrap_components as dbc
 from typing import List, Dict, Any, Optional
 
-import sys
-from pathlib import Path
-# Add GUI directory to path for config package imports
-gui_dir = Path(__file__).parent.parent.parent.parent
-sys.path.insert(0, str(gui_dir))
 from config.log_config import get_logger
-
-# Import port detection utilities
-sys.path.insert(0, str(Path(__file__).parent.parent))
 from utils.port_detection import get_port_dropdown_options, get_baud_rate_dropdown_options
 
 logger = get_logger(__name__)
@@ -39,7 +31,7 @@ class NavigationBar:
                         dcc.Dropdown(
                             id="port-selection-dropdown",
                             options=[],  # Will be populated by callback
-                            value="mock",  # Default to mock mode
+                            value=None,  # No default port selected
                             clearable=False,
                             style={
                                 "width": "220px",

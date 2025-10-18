@@ -7,9 +7,7 @@ import pandas as pd
 
 import sys
 from pathlib import Path
-# Add GUI directory to path for config package imports
-gui_dir = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(gui_dir))
+# Use PYTHONPATH for imports
 from config.log_config import get_logger
 from services.communication_service import CommunicationService
 

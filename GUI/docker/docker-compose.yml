@@ -1,4 +1,5 @@
 services:
+  # Main GUI application
   hyperloop-gui:
     build:
       context: ..
@@ -10,7 +11,9 @@ services:
       - DASH_HOST=0.0.0.0
       - DASH_PORT=8050
       - DASH_DEBUG=false
-      - USE_MOCK_COMMUNICATION=true
+      - SERIAL_SERVER_MODE=true  # Use TCP serial server
+      - SERIAL_SERVER_HOST=host.docker.internal  # Cross-platform host reference
+      - SERIAL_SERVER_PORT=9999
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8050"]
@@ -18,6 +21,26 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    # Cross-platform host access
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+# Note: For cross-platform COM/serial port access:
+# 
+# 1. WINDOWS: 
+#    - Run serial server on host: python src/services/serial_server.py --port COM6
+#    - Uses host.docker.internal to connect from container
+#
+# 2. LINUX/MAC:
+#    - Run serial server on host: python src/services/serial_server.py --port /dev/ttyUSB0 (Linux) or /dev/tty.usbmodem* (Mac)
+#    - Uses host.docker.internal to connect from container
+#
+# 3. ALTERNATIVE - Direct device mapping (Linux/Mac only):
+#    Add to hyperloop-gui service:
+#    devices:
+#      - /dev/ttyUSB0:/dev/ttyUSB0  # Linux
+#      - /dev/ttyACM0:/dev/ttyACM0  # Linux alternative
+#    And set: SERIAL_SERVER_MODE=false
 
   # Optional: Add a database service if needed in the future
   # database:

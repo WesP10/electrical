@@ -16,9 +16,7 @@ from typing import Dict, List, Optional, Tuple
 import sys
 from pathlib import Path
 
-# Add GUI directory to path for config package imports
-gui_dir = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(gui_dir))
+# Use PYTHONPATH for imports
 from config.log_config import get_logger
 
 logger = get_logger(__name__)
@@ -564,7 +562,7 @@ class CommunicationService:
         # Check if serial server mode is enabled (indicates we should use TCP)
         serial_server_mode = os.environ.get('SERIAL_SERVER_MODE', 'false').lower() == 'true'
         
-        if serial_server_mode and not config.use_mock:
+        if serial_server_mode:
             logger.info("Using TCPCommunication to connect to serial server")
             # Check if serial server is actually running
             try:
@@ -580,17 +578,12 @@ class CommunicationService:
                         reconnect_delay=2.0
                     )
                 else:
-                    logger.warning("SERIAL_SERVER_MODE enabled but no server found on port 9999, falling back to mock")
-                    from sensors.mock_communication import MockCommunication
-                    self.comm = MockCommunication()
+                    logger.error("SERIAL_SERVER_MODE enabled but no server found on port 9999")
+                    self.comm = None
             except Exception as e:
-                logger.error(f"Error checking for serial server: {e}, using mock communication")
-                from sensors.mock_communication import MockCommunication
-                self.comm = MockCommunication()
-        elif config.use_mock or config.port == 'loop://' or config.port.startswith('mock'):
-            logger.info("Using MockCommunication (simulated sensor data)")
-            from sensors.mock_communication import MockCommunication
-            self.comm = MockCommunication()
+                logger.error(f"Error checking for serial server: {e}")
+                self.comm = None
+
         else:
             logger.info("Using TCPCommunication to connect to serial server")
             # For TCP communication, we connect to the serial server
@@ -601,49 +594,72 @@ class CommunicationService:
                 reconnect_delay=2.0
             )
         
-        # Start communication
-        self.comm.start()
-        logger.info("Communication service initialized and started")
+        # Start communication if available
+        if self.comm:
+            self.comm.start()
+            logger.info("Communication service initialized and started")
+        else:
+            logger.warning("No communication interface available - running without hardware")
     
     def set_discovery_callback(self, callback):
         """Set callback for sensor discovery."""
-        return self.comm.set_discovery_callback(callback)
+        if self.comm:
+            return self.comm.set_discovery_callback(callback)
+        return False
     
     def register_data_callback(self, sensor_name, callback):
         """Register callback for sensor data."""
-        return self.comm.register_data_callback(sensor_name, callback)
+        if self.comm:
+            return self.comm.register_data_callback(sensor_name, callback)
+        return False
     
     def deregister_data_callback(self, sensor_name):
         """Deregister callback for sensor data."""
-        return self.comm.deregister_data_callback(sensor_name)
+        if self.comm:
+            return self.comm.deregister_data_callback(sensor_name)
+        return False
     
     def register_callback(self, sensor_id, callback):
         """Register callback for sensor data (legacy interface)."""
-        return self.comm.register_callback(sensor_id, callback)
+        if self.comm:
+            return self.comm.register_callback(sensor_id, callback)
+        return False
     
     def deregister_callback(self, sensor_id):
         """Deregister callback for sensor data (legacy interface)."""
-        return self.comm.deregister_callback(sensor_id)
+        if self.comm:
+            return self.comm.deregister_callback(sensor_id)
+        return False
     
     def get_discovered_sensors(self):
         """Get list of discovered sensor names."""
-        return self.comm.get_discovered_sensors()
+        if self.comm:
+            return self.comm.get_discovered_sensors()
+        return {}
     
     def get_buffer_lines(self, n=10):
         """Get the last n lines from the buffer."""
-        return self.comm.get_buffer_lines(n)
+        if self.comm:
+            return self.comm.get_buffer_lines(n)
+        return []
     
     def is_connected_to_server(self):
         """Check if connected to the serial server (TCP only)."""
-        if hasattr(self.comm, 'is_connected_to_server'):
+        if self.comm and hasattr(self.comm, 'is_connected_to_server'):
             return self.comm.is_connected_to_server()
-        return True  # Mock communication is always "connected"
+        return False  # No communication available
     
     def get_connection_status(self):
         """Get current connection status."""
-        if hasattr(self.comm, 'get_connection_status'):
+        if self.comm and hasattr(self.comm, 'get_connection_status'):
             return self.comm.get_connection_status()
-        return {'connected': True, 'error': None}  # Mock communication status
+        return {'connected': False, 'error': 'No communication interface available'}
+    
+    def is_connected(self) -> bool:
+        """Check if communication interface is connected."""
+        if not self.comm:
+            return False
+        return self.is_connected_to_server()
     
     def has_recent_data_for_sensor(self, sensor_name: str) -> bool:
         """Check if sensor has recent data (within last 5 seconds)."""
@@ -653,7 +669,7 @@ class CommunicationService:
     
     def get_sensor_data_dataframe(self, sensor_name: str):
         """Get recent sensor data as pandas DataFrame."""
-        if hasattr(self.comm, 'get_sensor_data_dataframe'):
+        if self.comm and hasattr(self.comm, 'get_sensor_data_dataframe'):
             return self.comm.get_sensor_data_dataframe(sensor_name)
         return None
     
@@ -662,32 +678,10 @@ class CommunicationService:
         if self.comm:
             self.comm.close()
             logger.info("Communication service closed")
+        else:
+            logger.info("No communication service to close")
     
-    def switch_to_mock_mode(self) -> bool:
-        """Switch to mock communication mode."""
-        try:
-            logger.info("Switching communication service to mock mode")
-            
-            # Stop current communication
-            if self.comm:
-                self.comm.stop()
-                self.comm.close()
-            
-            # Create new mock communication
-            from sensors.mock_communication import MockCommunication
-            self.comm = MockCommunication()
-            self.comm.start()
-            
-            # Update config to reflect new mode
-            self.config.use_mock = True
-            self.config.port = 'mock://'
-            
-            logger.info("Successfully switched to mock communication mode")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error switching to mock mode: {e}")
-            return False
+
     
     def switch_to_hardware_mode(self, port: str, baud_rate: int) -> bool:
         """Switch to hardware communication mode with specified port and baud rate."""
@@ -708,7 +702,6 @@ class CommunicationService:
             self.comm.start()
             
             # Update config to reflect new mode
-            self.config.use_mock = False
             self.config.port = port
             self.config.baudrate = baud_rate
             

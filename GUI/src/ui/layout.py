@@ -10,11 +10,6 @@ from core.dependencies import container
 from services.sensor_service import SensorService
 from services.profile_service import ProfileService
 from sensors.sensor_registry import sensor_registry
-import sys
-from pathlib import Path
-# Add GUI directory to path for config package imports
-gui_dir = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(gui_dir))
 from config.log_config import get_logger
 
 logger = get_logger(__name__)
@@ -58,10 +53,10 @@ class MainLayout:
             self.sidebar.add_nav_item('emergency', 'Emergency Stop', 'fas fa-exclamation-triangle', is_critical=True)
             self.sidebar.add_nav_item('safety', 'Safety Verification', 'fas fa-shield-alt')
 
-            # Add profile page
+            # Add profile page for VFD operational modes
             profile_page = ProfilePage()
             self.pages['profiles'] = profile_page.create_layout()
-            self.sidebar.add_nav_item('profiles', 'VFD Profiles', 'fas fa-cog')
+            self.sidebar.add_nav_item('profiles', 'VFD Profiles', 'fas fa-rocket')
             
             # Set default page
             self.default_page = 'sensors'
@@ -128,7 +123,7 @@ class MainLayout:
             sensor_callbacks = SensorCallbacks()
             sensor_callbacks.register(app)
             
-            # Register profile callbacks
+            # Register VFD profile callbacks
             profile_callbacks = ProfileCallbacks()
             profile_callbacks.register(app)
             
