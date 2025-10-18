@@ -6,11 +6,6 @@ import pandas as pd
 from typing import List, Dict, Any, Optional
 
 from ui.components.common import InfoCard, StatusIndicator, LoadingSpinner
-import sys
-from pathlib import Path
-# Add GUI directory to path for config package imports
-gui_dir = Path(__file__).parent.parent.parent.parent
-sys.path.insert(0, str(gui_dir))
 from config.log_config import get_logger
 
 logger = get_logger(__name__)
@@ -150,11 +145,11 @@ class SensorSelector:
 class MicrocontrollerIOMap:
     """Microcontroller I/O pin mapping visualization component."""
     
-    def __init__(self, sensor_names: List[str], use_mock: bool = True):
+    def __init__(self, sensor_names: List[str], has_connected_hardware: bool = False):
         self.sensor_names = sensor_names
-        self.use_mock = use_mock
+        self.has_connected_hardware = has_connected_hardware
         # Define pin mappings (this would typically come from configuration)
-        self.pin_mappings = self._generate_pin_mappings(sensor_names) if not use_mock else {}
+        self.pin_mappings = self._generate_pin_mappings(sensor_names) if has_connected_hardware else {}
     
     def _generate_pin_mappings(self, sensor_names: List[str]) -> Dict[str, Dict[str, Any]]:
         """Generate pin mappings for sensors."""
@@ -174,8 +169,8 @@ class MicrocontrollerIOMap:
     
     def create(self) -> dbc.Card:
         """Create microcontroller I/O visualization card."""
-        # Check if we have pin mappings or if we're in mock mode
-        if not self.pin_mappings or self.use_mock:
+        # Check if we have pin mappings (hardware is connected)
+        if not self.pin_mappings or not self.has_connected_hardware:
             # Show "no sensors connected" state
             card_content = dbc.CardBody([
                 html.Div([

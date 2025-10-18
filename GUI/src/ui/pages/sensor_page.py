@@ -7,11 +7,6 @@ from ui.components.sensor import SensorGrid, SensorSelector, SensorSummary, Micr
 from ui.components.common import IntervalComponent
 from core.dependencies import container
 from services.communication_service import CommunicationService
-import sys
-from pathlib import Path
-# Add GUI directory to path for config package imports
-gui_dir = Path(__file__).parent.parent.parent.parent
-sys.path.insert(0, str(gui_dir))
 from config.log_config import get_logger
 
 logger = get_logger(__name__)
@@ -26,15 +21,15 @@ class SensorDashboardPage:
         self.sensor_selector = SensorSelector(sensor_names)
         self.sensor_summary = SensorSummary()
         
-        # Check if using mock communication
+        # Check if hardware is connected
         try:
             comm_service = container.get(CommunicationService)
-            use_mock = comm_service.config.use_mock or comm_service.config.port == 'loop://'
+            has_connected_hardware = comm_service.is_connected()
         except Exception as e:
-            logger.warning(f"Could not determine mock status: {e}")
-            use_mock = True
+            logger.warning(f"Could not determine connection status: {e}")
+            has_connected_hardware = False
         
-        self.io_map = MicrocontrollerIOMap(sensor_names, use_mock=use_mock)
+        self.io_map = MicrocontrollerIOMap(sensor_names, has_connected_hardware=has_connected_hardware)
         
         # Add all sensors to grid initially
         for sensor_name in sensor_names:

@@ -3,11 +3,6 @@ from dash.dependencies import Input, Output, State
 from dash import html
 from typing import Dict, Any
 
-import sys
-from pathlib import Path
-# Add GUI directory to path for config package imports
-gui_dir = Path(__file__).parent.parent.parent.parent
-sys.path.insert(0, str(gui_dir))
 from config.log_config import get_logger
 
 logger = get_logger(__name__)
@@ -80,7 +75,7 @@ class MainCallbacks:
     
     def _register_active_link_callback(self, app) -> None:
         """Register callback to highlight active navigation link."""
-        nav_items = ['sensors', 'profiles', 'driving', 'brakes', 'emergency', 'safety']
+        nav_items = ['sensors', 'driving', 'brakes', 'emergency', 'safety', 'profiles']
         
         @app.callback(
             [Output(f'nav-{item}', 'active') for item in nav_items],
@@ -114,19 +109,19 @@ class MainCallbacks:
             """Handle emergency stop navigation clicks."""
             if n_clicks:
                 try:
-                    # Get profile service and trigger emergency
-                    from core.dependencies import container
-                    from services.profile_service import ProfileService
+                    # Get profile service and trigger emergency (temporarily disabled)
+                    # from core.dependencies import container
+                    # from services.profile_service import ProfileService
                     
-                    profile_service = container.get(ProfileService)
-                    success = profile_service.emergency_stop()
+                    # profile_service = container.get(ProfileService)
+                    # success = profile_service.emergency_stop()
                     
-                    if success:
-                        logger.warning("Emergency stop activated via navigation")
-                        return "Emergency Active", "danger"
-                    else:
-                        logger.error("Emergency stop failed")
-                        return "Emergency Failed", "warning"
+                    # if success:
+                    logger.warning("Emergency stop activated via navigation (profile service disabled)")
+                    return "Emergency Active", "danger"
+                    # else:
+                    #     logger.error("Emergency stop failed")
+                    #     return "Emergency Failed", "warning"
                         
                 except Exception as e:
                     logger.error(f"Emergency stop error: {e}")

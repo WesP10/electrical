@@ -12,12 +12,11 @@ import socket
 import threading
 import time
 from abc import ABC, abstractmethod
+from typing import Dict, List, Optional, Tuple
 import sys
 from pathlib import Path
 
-# Add GUI directory to path for config package imports
-gui_dir = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(gui_dir))
+# Use PYTHONPATH for imports
 from config.log_config import get_logger
 
 logger = get_logger(__name__)
@@ -499,9 +498,8 @@ class TCPCommunication(BaseCommunication):
         last_seen = self.discovered_sensors[sensor_name]['last_seen']
         time_diff = current_time - last_seen
         
-        # Use longer timeout for discovered sensors (30 seconds instead of 5)
-        # This accounts for Arduino header messages being sent infrequently
-        discovery_timeout = 30.0
+        # Use shorter timeout for faster disconnection detection
+        discovery_timeout = 10.0  # Reduced from 30 seconds
         recent_discovery = time_diff < discovery_timeout
         
         logger.info(f"Sensor {sensor_name}: last_seen={last_seen}, current={current_time}, diff={time_diff:.2f}s")
@@ -511,10 +509,9 @@ class TCPCommunication(BaseCommunication):
             logger.info(f"Sensor {sensor_name} has recent discovery data")
             return True
         else:
-            logger.info(f"Sensor {sensor_name} discovery data is old, but may still be active")
-            # TODO: Could also check if server reports sensor as currently active
-            # For now, assume old discovered sensors are still valid if they were recently discovered
-            return time_diff < 300.0  # 5 minute absolute timeout
+            logger.info(f"Sensor {sensor_name} discovery data is old")
+            # Mark as unavailable after timeout
+            return False
     
     def get_sensor_data_dataframe(self, sensor_name: str):
         """Get recent sensor data as pandas DataFrame."""
@@ -565,7 +562,7 @@ class CommunicationService:
         # Check if serial server mode is enabled (indicates we should use TCP)
         serial_server_mode = os.environ.get('SERIAL_SERVER_MODE', 'false').lower() == 'true'
         
-        if serial_server_mode and not config.use_mock:
+        if serial_server_mode:
             logger.info("Using TCPCommunication to connect to serial server")
             # Check if serial server is actually running
             try:
@@ -581,17 +578,12 @@ class CommunicationService:
                         reconnect_delay=2.0
                     )
                 else:
-                    logger.warning("SERIAL_SERVER_MODE enabled but no server found on port 9999, falling back to mock")
-                    from sensors.mock_communication import MockCommunication
-                    self.comm = MockCommunication()
+                    logger.error("SERIAL_SERVER_MODE enabled but no server found on port 9999")
+                    self.comm = None
             except Exception as e:
-                logger.error(f"Error checking for serial server: {e}, using mock communication")
-                from sensors.mock_communication import MockCommunication
-                self.comm = MockCommunication()
-        elif config.use_mock or config.port == 'loop://' or config.port.startswith('mock'):
-            logger.info("Using MockCommunication (simulated sensor data)")
-            from sensors.mock_communication import MockCommunication
-            self.comm = MockCommunication()
+                logger.error(f"Error checking for serial server: {e}")
+                self.comm = None
+
         else:
             logger.info("Using TCPCommunication to connect to serial server")
             # For TCP communication, we connect to the serial server
@@ -602,49 +594,72 @@ class CommunicationService:
                 reconnect_delay=2.0
             )
         
-        # Start communication
-        self.comm.start()
-        logger.info("Communication service initialized and started")
+        # Start communication if available
+        if self.comm:
+            self.comm.start()
+            logger.info("Communication service initialized and started")
+        else:
+            logger.warning("No communication interface available - running without hardware")
     
     def set_discovery_callback(self, callback):
         """Set callback for sensor discovery."""
-        return self.comm.set_discovery_callback(callback)
+        if self.comm:
+            return self.comm.set_discovery_callback(callback)
+        return False
     
     def register_data_callback(self, sensor_name, callback):
         """Register callback for sensor data."""
-        return self.comm.register_data_callback(sensor_name, callback)
+        if self.comm:
+            return self.comm.register_data_callback(sensor_name, callback)
+        return False
     
     def deregister_data_callback(self, sensor_name):
         """Deregister callback for sensor data."""
-        return self.comm.deregister_data_callback(sensor_name)
+        if self.comm:
+            return self.comm.deregister_data_callback(sensor_name)
+        return False
     
     def register_callback(self, sensor_id, callback):
         """Register callback for sensor data (legacy interface)."""
-        return self.comm.register_callback(sensor_id, callback)
+        if self.comm:
+            return self.comm.register_callback(sensor_id, callback)
+        return False
     
     def deregister_callback(self, sensor_id):
         """Deregister callback for sensor data (legacy interface)."""
-        return self.comm.deregister_callback(sensor_id)
+        if self.comm:
+            return self.comm.deregister_callback(sensor_id)
+        return False
     
     def get_discovered_sensors(self):
         """Get list of discovered sensor names."""
-        return self.comm.get_discovered_sensors()
+        if self.comm:
+            return self.comm.get_discovered_sensors()
+        return {}
     
     def get_buffer_lines(self, n=10):
         """Get the last n lines from the buffer."""
-        return self.comm.get_buffer_lines(n)
+        if self.comm:
+            return self.comm.get_buffer_lines(n)
+        return []
     
     def is_connected_to_server(self):
         """Check if connected to the serial server (TCP only)."""
-        if hasattr(self.comm, 'is_connected_to_server'):
+        if self.comm and hasattr(self.comm, 'is_connected_to_server'):
             return self.comm.is_connected_to_server()
-        return True  # Mock communication is always "connected"
+        return False  # No communication available
     
     def get_connection_status(self):
         """Get current connection status."""
-        if hasattr(self.comm, 'get_connection_status'):
+        if self.comm and hasattr(self.comm, 'get_connection_status'):
             return self.comm.get_connection_status()
-        return {'connected': True, 'error': None}  # Mock communication status
+        return {'connected': False, 'error': 'No communication interface available'}
+    
+    def is_connected(self) -> bool:
+        """Check if communication interface is connected."""
+        if not self.comm:
+            return False
+        return self.is_connected_to_server()
     
     def has_recent_data_for_sensor(self, sensor_name: str) -> bool:
         """Check if sensor has recent data (within last 5 seconds)."""
@@ -654,7 +669,7 @@ class CommunicationService:
     
     def get_sensor_data_dataframe(self, sensor_name: str):
         """Get recent sensor data as pandas DataFrame."""
-        if hasattr(self.comm, 'get_sensor_data_dataframe'):
+        if self.comm and hasattr(self.comm, 'get_sensor_data_dataframe'):
             return self.comm.get_sensor_data_dataframe(sensor_name)
         return None
     
@@ -663,3 +678,94 @@ class CommunicationService:
         if self.comm:
             self.comm.close()
             logger.info("Communication service closed")
+        else:
+            logger.info("No communication service to close")
+    
+
+    
+    def switch_to_hardware_mode(self, port: str, baud_rate: int) -> bool:
+        """Switch to hardware communication mode with specified port and baud rate."""
+        try:
+            logger.info(f"Switching communication service to hardware mode: {port} at {baud_rate} baud")
+            
+            # Stop current communication
+            if self.comm:
+                self.comm.stop() 
+                self.comm.close()
+            
+            # Create new TCP communication to serial server
+            self.comm = TCPCommunication(
+                server_host='localhost',
+                server_port=9999,
+                reconnect_delay=2.0
+            )
+            self.comm.start()
+            
+            # Update config to reflect new mode
+            self.config.port = port
+            self.config.baudrate = baud_rate
+            
+            # Send reconfiguration message to serial server
+            success = self._reconfigure_serial_server(port, baud_rate)
+            
+            if success:
+                logger.info(f"Successfully switched to hardware mode: {port} at {baud_rate} baud")
+                return True
+            else:
+                logger.warning("Hardware mode switch partially successful - server reconfiguration pending")
+                # Even if reconfiguration fails initially, the TCP connection might work
+                # Let's check if we can at least connect to the server
+                if self.is_connected_to_server():
+                    logger.info("TCP connection established, hardware mode switch considered successful")
+                    return True
+                else:
+                    logger.error("Failed to establish TCP connection to serial server")
+                    return False
+                
+        except Exception as e:
+            logger.error(f"Error switching to hardware mode: {e}")
+            return False
+    
+    def _reconfigure_serial_server(self, port: str, baud_rate: int) -> bool:
+        """Send reconfiguration request to serial server."""
+        try:
+            if hasattr(self.comm, '_send_request'):
+                request = {
+                    'type': 'reconfigure_connection',
+                    'port': port,
+                    'baud_rate': baud_rate
+                }
+                response = self.comm._send_request(request, timeout=10.0)
+                if response and response.get('type') == 'reconfigure_response':
+                    return response.get('success', False)
+            return False
+        except Exception as e:
+            logger.error(f"Error reconfiguring serial server: {e}")
+            return False
+    
+    def get_current_mode(self) -> Dict:
+        """Get current communication mode and settings."""
+        # Determine if we're in mock mode based on actual communication type
+        is_mock = False
+        if self.comm:
+            comm_type = type(self.comm).__name__
+            is_mock = comm_type == 'MockCommunication'
+        
+        mode_info = {
+            'is_mock': is_mock,
+            'port': getattr(self.config, 'port', 'unknown'),
+            'baud_rate': getattr(self.config, 'baudrate', 115200),
+            'connected': self.is_connected_to_server()
+        }
+        
+        if hasattr(self.comm, 'get_connection_status'):
+            status = self.comm.get_connection_status()
+            mode_info.update(status)
+        
+        return mode_info
+    
+    def clear_discovered_sensors(self) -> None:
+        """Clear all discovered sensors (used when switching microcontrollers)."""
+        if hasattr(self.comm, 'discovered_sensors'):
+            self.comm.discovered_sensors.clear()
+            logger.info("Cleared discovered sensors for microcontroller switch")

@@ -4,13 +4,8 @@
 import sys
 import os
 
-# Add current directory and GUI directory to path for config package imports
+# Use PYTHONPATH for imports
 from pathlib import Path
-current_file = Path(__file__).resolve()
-src_dir = current_file.parent
-gui_dir = src_dir.parent
-sys.path.insert(0, str(src_dir))
-sys.path.insert(0, str(gui_dir))
 
 def test_imports():
     """Test all major imports."""

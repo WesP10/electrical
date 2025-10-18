@@ -9,7 +9,7 @@ from core.dependencies import container
 from core.exceptions import HyperloopGUIError, CommunicationError
 from services.tcp_communication_service import CommunicationService
 from services.sensor_service import SensorService
-from services.profile_service import ProfileService
+# from services.profile_service import ProfileService
 from ui.layout import MainLayout
 
 logger = get_logger(__name__)
@@ -44,6 +44,8 @@ class HyperloopGUIApplication:
             sensor_service = SensorService(communication_service)
             container.register(SensorService, sensor_service)
             
+            # Import and register ProfileService for VFD operational modes
+            from services.profile_service import ProfileService
             profile_service = ProfileService(communication_service)
             container.register(ProfileService, profile_service)
             

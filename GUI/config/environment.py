@@ -7,23 +7,29 @@ import sys
 from pathlib import Path
 
 # Get the project root directory (GUI folder)
-PROJECT_ROOT = Path(__file__).parent.parent.parent.absolute()
+# Use PYTHONPATH environment variable if available, otherwise use relative path
+if "PYTHONPATH" in os.environ:
+    PROJECT_ROOT = Path(os.environ["PYTHONPATH"])
+else:
+    PROJECT_ROOT = Path(__file__).parent.parent
+
 SRC_DIR = PROJECT_ROOT / "src"
 
 # Set up Python path
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-# Configure centralized cache directory
-CACHE_DIR = PROJECT_ROOT / "__pycache__"
-os.environ["PYTHONPYCACHEPREFIX"] = str(CACHE_DIR)
+# Configure centralized cache directory (only if not in container)
+if not Path("/.dockerenv").exists():
+    CACHE_DIR = PROJECT_ROOT / "__pycache__"
+    os.environ["PYTHONPYCACHEPREFIX"] = str(CACHE_DIR)
 
 # Environment variables for the application
 ENVIRONMENT_DEFAULTS = {
-    "DASH_HOST": "127.0.0.1",
+    "DASH_HOST": "0.0.0.0",  # Docker-friendly default
     "DASH_PORT": "8050",
-    "DASH_DEBUG": "true",
-    "USE_MOCK_COMMUNICATION": "false",
+    "DASH_DEBUG": "false",  # Production-safe default
+    "USE_MOCK_COMMUNICATION": "true",  # Default to mock since hardware detection is removed
     "SERIAL_PORT": "loop://",
     "SERIAL_BAUDRATE": "115200",
     "SERIAL_TIMEOUT": "100",
