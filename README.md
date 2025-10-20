@@ -25,18 +25,6 @@ docker-compose -f docker/docker-compose.yml up --build
 # Access at: http://localhost:8050
 ```
 
-
-## Docker Setup with Serial Port Access
-
-Since Docker containers cannot directly access host serial ports, we use a **serial server bridge** architecture for hardware connectivity:
-
-```
-Host System (Windows/Mac/Linux)
-├── Serial Port (Arduino/Microcontroller)
-├── Serial Server (Python) ── TCP Port 9999
-└── Docker Container (GUI) ── Connects to TCP Port 9999
-```
-
 ### Universal Serial Setup (Works on Windows/Mac/Linux)
 
 ***Start Universal Serial Server with Flags**
@@ -58,6 +46,16 @@ cd docker
 # From docker directory
 docker-compose up --build
 # Access at: http://localhost:8050
+```
+## Docker Setup with Serial Port Access
+
+Since Docker containers cannot directly access host serial ports, we use a **serial server bridge** architecture for hardware connectivity:
+
+```
+Host System (Windows/Mac/Linux)
+├── Serial Port (Arduino/Microcontroller)
+├── Serial Server (Python) ── TCP Port 9999
+└── Docker Container (GUI) ── Connects to TCP Port 9999
 ```
 
 ### Auto-Detection Features
@@ -82,7 +80,7 @@ The serial server automatically detects microcontrollers with confidence scoring
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `SERIAL_SERVER_MODE` | Enable TCP serial server mode | `true` |
-| `SERIAL_SERVER_HOST` | Serial server hostname | `host.docker.internal` |
+| `SERIAL_SERVER_HOST` | Serial server hostname | `127.0.0.1` |
 | `SERIAL_SERVER_PORT` | Serial server TCP port | `9999` |
 | `DASH_HOST` | GUI host binding | `0.0.0.0` |
 | `DASH_PORT` | GUI port | `8050` |

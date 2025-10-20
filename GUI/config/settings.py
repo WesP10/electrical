@@ -7,7 +7,7 @@ from typing import Optional
 @dataclass
 class CommunicationConfig:
     """Configuration for communication settings."""
-    port: str = 'loop://'
+    port: str = '127.0.0.1'
     baudrate: int = 115200
     timeout: int = 100
     use_mock: bool = False
@@ -33,7 +33,7 @@ class AppConfig:
 def load_config() -> AppConfig:
     """Load configuration from environment variables with sensible defaults."""
     communication_config = CommunicationConfig(
-        port=os.environ.get('SERIAL_PORT', 'loop://'),
+        port=os.environ.get('SERIAL_PORT', '127.0.0.1'),
         baudrate=int(os.environ.get('SERIAL_BAUDRATE', '115200')),
         timeout=int(os.environ.get('SERIAL_TIMEOUT', '100')),
         use_mock=os.environ.get('USE_MOCK_COMMUNICATION', 'false').lower() == 'true'

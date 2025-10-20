@@ -516,9 +516,9 @@ class SerialCommunicationServer:
         try:
             self.tcp_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.tcp_server.bind(('localhost', self.tcp_port))
+            self.tcp_server.bind(('0.0.0.0', self.tcp_port))
             self.tcp_server.listen(5)
-            logger.info(f"TCP server listening on localhost:{self.tcp_port}")
+            logger.info(f"TCP server listening on 0.0.0.0:{self.tcp_port}")
             
             while self.tcp_running:
                 try:
@@ -544,6 +544,7 @@ class SerialCommunicationServer:
                     self._send_to_client(client_socket, {
                         'type': 'server_status',
                         'serial_connected': self.serial_conn and self.serial_conn.is_open,
+                        'serial_port': self.serial_port,
                         'discovered_sensors': list(self.discovered_sensors.keys()),
                         'buffer_size': buffer_size,
                         'retention_seconds': self.DATA_RETENTION_SECONDS

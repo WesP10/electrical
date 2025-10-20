@@ -562,35 +562,26 @@ class CommunicationService:
         # Check if serial server mode is enabled (indicates we should use TCP)
         serial_server_mode = os.environ.get('SERIAL_SERVER_MODE', 'false').lower() == 'true'
         
+        # Get serial server connection details from environment
+        server_host = os.environ.get('SERIAL_SERVER_HOST', 'localhost')
+        server_port = int(os.environ.get('SERIAL_SERVER_PORT', '9999'))
+        
         if serial_server_mode:
-            logger.info("Using TCPCommunication to connect to serial server")
-            # Check if serial server is actually running
-            try:
-                import socket
-                test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                result = test_socket.connect_ex(('localhost', 9999))
-                test_socket.close()
-                if result == 0:
-                    logger.info("Serial server detected on port 9999, using TCP communication")
-                    self.comm = TCPCommunication(
-                        server_host='localhost',
-                        server_port=9999,
-                        reconnect_delay=2.0
-                    )
-                else:
-                    logger.error("SERIAL_SERVER_MODE enabled but no server found on port 9999")
-                    self.comm = None
-            except Exception as e:
-                logger.error(f"Error checking for serial server: {e}")
-                self.comm = None
-
+            logger.info(f"Using TCPCommunication to connect to serial server at {server_host}:{server_port}")
+            # Don't check if server is running at startup - let TCPCommunication handle reconnection
+            # This is important for Docker environments where the server may not be immediately available
+            self.comm = TCPCommunication(
+                server_host=server_host,
+                server_port=server_port,
+                reconnect_delay=2.0
+            )
         else:
-            logger.info("Using TCPCommunication to connect to serial server")
+            logger.info(f"Using TCPCommunication to connect to serial server at {server_host}:{server_port}")
             # For TCP communication, we connect to the serial server
             # The serial server should already be running and connected to the actual serial port
             self.comm = TCPCommunication(
-                server_host='localhost',
-                server_port=9999,  # Default port for serial server
+                server_host=server_host,
+                server_port=server_port,
                 reconnect_delay=2.0
             )
         
