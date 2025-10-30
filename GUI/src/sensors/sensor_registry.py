@@ -22,6 +22,7 @@ class SensorRegistry:
         # List of all valid sensor files (without .py extension)
         sensor_files = [
             'ultrasonic_sensor',
+            'vl6180x_sensor',
             'accelerometer_sensor', 
             'pressure_sensor',
             'temperature_sensor',
