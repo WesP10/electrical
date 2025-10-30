@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 # Use PYTHONPATH for imports
 from config.log_config import get_logger
-from services.communication_service import CommunicationService
+from services.tcp_communication_service import CommunicationService
 
 logger = get_logger(__name__)
 

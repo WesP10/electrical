@@ -4,7 +4,7 @@ import pandas as pd
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 
-from services.communication_service import CommunicationService
+from services.tcp_communication_service import CommunicationService
 from utils.data_processing import clean_sensor_data, validate_sensor_data
 import sys
 from pathlib import Path

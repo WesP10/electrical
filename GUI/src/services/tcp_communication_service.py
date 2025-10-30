@@ -1,9 +1,10 @@
 """
-TCP Communication Client
+TCP Communication Service
 
-This replaces the PySerial communication service with a lightweight TCP client
-that connects to the dedicated serial server process. This allows the GUI to
-receive serial data without directly accessing the COM port.
+Direct TCP client that connects to the dedicated serial server process. 
+This allows the GUI to receive serial data without directly accessing the COM port.
+
+No mock modes, no abstractions - just a clean TCP client implementation.
 """
 
 import json
@@ -11,8 +12,7 @@ import os
 import socket
 import threading
 import time
-from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 import sys
 from pathlib import Path
 
@@ -22,27 +22,75 @@ from config.log_config import get_logger
 logger = get_logger(__name__)
 
 
-class BaseCommunication(ABC):
-    """Abstract base class for all communication implementations."""
+class CommunicationService:
+    """
+    TCP-based communication client that requests data from the serial server.
+    Uses request-response pattern instead of passive broadcasts.
+    This allows GUI hot reload without COM port conflicts.
+    """
     
-    def __init__(self):
+    def __init__(self, config=None, server_host=None, server_port=None, reconnect_delay=2.0, poll_interval=0.5):
+        """
+        Initialize the communication service.
+        
+        Args:
+            config: CommunicationConfig object (optional, uses env vars if not provided)
+            server_host: Override server host (defaults to env SERIAL_SERVER_HOST)
+            server_port: Override server port (defaults to env SERIAL_SERVER_PORT)
+            reconnect_delay: Delay between reconnection attempts
+            poll_interval: How often to request data
+        """
+        self.config = config
+        
+        # Get configuration from environment or parameters
+        self.server_host = server_host or os.environ.get('SERIAL_SERVER_HOST', 'localhost')
+        # Get configuration from environment or parameters
+        self.server_host = server_host or os.environ.get('SERIAL_SERVER_HOST', 'localhost')
+        self.server_port = server_port or int(os.environ.get('SERIAL_SERVER_PORT', '9999'))
+        self.reconnect_delay = reconnect_delay
+        self.poll_interval = poll_interval  # How often to request data
+        
+        # Callbacks
         self.sensor_discovery_callback = None
         self.sensor_data_callbacks = {}  # {sensor_name: callback_function}
         
-    @abstractmethod
-    def start(self):
-        """Start the communication service."""
-        pass
-    
-    @abstractmethod
-    def stop(self):
-        """Stop the communication service."""
-        pass
-    
-    @abstractmethod
-    def close(self):
-        """Close and cleanup the communication service."""
-        pass
+        self.socket = None
+        self.running = False
+        self.client_thread = None
+        self.request_thread = None
+        self.reconnect_delay = reconnect_delay
+        self.poll_interval = poll_interval  # How often to request data
+        
+        self.socket = None
+        self.running = False
+        self.client_thread = None
+        self.request_thread = None
+        
+        # Request tracking
+        self.request_id_counter = 0
+        self.pending_requests = {}  # {request_id: response_event}
+        self.request_lock = threading.Lock()
+        
+        # Data storage
+        self.discovered_sensors = {}  # {sensor_name: {'pins': [], 'last_seen': timestamp}}
+        self.connection_status = {'connected': False, 'error': None}
+        self.last_data_request = 0  # Timestamp of last data request
+        
+        # Sensor data buffer (stores recent readings for each sensor)
+        self.sensor_data_buffer = {}  # {sensor_name: [(timestamp, values), ...]}
+        self.max_data_points = 100  # Keep last 100 data points per sensor
+        self.data_buffer_lock = threading.Lock()
+        
+        # Console message buffer for debugging (stores last 100 messages)
+        self.console_messages = []  # List of {timestamp, direction, message} dicts
+        self.max_console_messages = 100
+        self.console_lock = threading.Lock()
+        
+        logger.info(f"TCP Communication initialized to connect to {self.server_host}:{self.server_port}")
+        logger.info(f"Data polling interval: {self.poll_interval}s")
+        
+        # Auto-start the service
+        self.start()
     
     def set_discovery_callback(self, callback):
         """
@@ -77,39 +125,6 @@ class BaseCommunication(ABC):
         if sensor_id in self.sensor_data_callbacks:
             del self.sensor_data_callbacks[sensor_id]
             logger.debug(f"Deregistered legacy callback for sensor: {sensor_id}")
-
-
-class TCPCommunication(BaseCommunication):
-    """
-    Active TCP-based communication client that requests data from the serial server.
-    Uses request-response pattern instead of passive broadcasts.
-    This allows GUI hot reload without COM port conflicts.
-    """
-    
-    def __init__(self, server_host='localhost', server_port=9999, reconnect_delay=2.0, poll_interval=0.5):
-        super().__init__()
-        self.server_host = server_host
-        self.server_port = server_port
-        self.reconnect_delay = reconnect_delay
-        self.poll_interval = poll_interval  # How often to request data
-        
-        self.socket = None
-        self.running = False
-        self.client_thread = None
-        self.request_thread = None
-        
-        # Request tracking
-        self.request_id_counter = 0
-        self.pending_requests = {}  # {request_id: response_event}
-        self.request_lock = threading.Lock()
-        
-        # Data storage
-        self.discovered_sensors = {}  # {sensor_name: {'pins': [], 'last_seen': timestamp}}
-        self.connection_status = {'connected': False, 'error': None}
-        self.last_data_request = 0  # Timestamp of last data request
-        
-        logger.info(f"Active TCPCommunication initialized to connect to {server_host}:{server_port}")
-        logger.info(f"Data polling interval: {poll_interval}s")
     
     def start(self):
         """Start the TCP client and data requesting threads."""
@@ -161,17 +176,20 @@ class TCPCommunication(BaseCommunication):
         """Attempt to connect to the serial server."""
         try:
             logger.info(f"Attempting to connect to serial server at {self.server_host}:{self.server_port}")
+            self._log_console_message('info', f"Connecting to {self.server_host}:{self.server_port}...")
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.settimeout(5.0)  # 5 second timeout for connection
             self.socket.connect((self.server_host, self.server_port))
             self.socket.settimeout(None)  # Remove timeout after connection
             
             logger.info(f"Successfully connected to serial server")
+            self._log_console_message('info', f"Connected to serial server")
             self.connection_status = {'connected': True, 'error': None}
             return True
             
         except socket.error as e:
             logger.warning(f"Failed to connect to serial server: {e}")
+            self._log_console_message('error', f"Connection failed: {e}")
             self.connection_status = {'connected': False, 'error': str(e)}
             if self.socket:
                 try:
@@ -182,6 +200,7 @@ class TCPCommunication(BaseCommunication):
             return False
         except Exception as e:
             logger.error(f"Unexpected error connecting to serial server: {e}")
+            self._log_console_message('error', f"Unexpected error: {e}")
             self.connection_status = {'connected': False, 'error': str(e)}
             if self.socket:
                 try:
@@ -207,6 +226,7 @@ class TCPCommunication(BaseCommunication):
                 data = self.socket.recv(8192)
                 if not data:
                     logger.warning("Server closed connection")
+                    self._log_console_message('error', "Server closed connection")
                     self._disconnect()
                     continue
                 
@@ -215,10 +235,13 @@ class TCPCommunication(BaseCommunication):
                 for message_str in messages:
                     if message_str:
                         try:
+                            # Log received message
+                            self._log_console_message('received', message_str)
                             message = json.loads(message_str)
                             self._process_server_response(message)
                         except json.JSONDecodeError as e:
                             logger.debug(f"Failed to parse JSON response: {message_str} - {e}")
+                            self._log_console_message('error', f"Invalid JSON: {message_str[:100]}...")
                 
             except socket.error as e:
                 logger.warning(f"TCP client error: {e}")
@@ -285,6 +308,7 @@ class TCPCommunication(BaseCommunication):
         try:
             # Send request
             request_json = json.dumps(request_data) + '\n'
+            self._log_console_message('sent', request_json.strip())
             self.socket.send(request_json.encode('utf-8'))
             
             # Wait for response
@@ -436,6 +460,21 @@ class TCPCommunication(BaseCommunication):
             if sensor_name in self.discovered_sensors:
                 self.discovered_sensors[sensor_name]['last_seen'] = timestamp
             
+            # Store sensor data in buffer
+            with self.data_buffer_lock:
+                if sensor_name not in self.sensor_data_buffer:
+                    self.sensor_data_buffer[sensor_name] = []
+                
+                # Add new data point
+                self.sensor_data_buffer[sensor_name].append({
+                    'timestamp': timestamp,
+                    'values': values
+                })
+                
+                # Keep only the last max_data_points
+                if len(self.sensor_data_buffer[sensor_name]) > self.max_data_points:
+                    self.sensor_data_buffer[sensor_name] = self.sensor_data_buffer[sensor_name][-self.max_data_points:]
+            
             # Call data callback if registered
             if sensor_name in self.sensor_data_callbacks:
                 logger.info(f"Calling callback for {sensor_name} with values {values}")
@@ -472,6 +511,25 @@ class TCPCommunication(BaseCommunication):
         """Get list of discovered sensor names."""
         return list(self.discovered_sensors.keys())
     
+    def get_console_messages(self, n=50):
+        """Get the last n console messages for display."""
+        with self.console_lock:
+            return self.console_messages[-n:] if self.console_messages else []
+    
+    def _log_console_message(self, direction: str, message: str):
+        """Log a message to the console buffer."""
+        import datetime
+        with self.console_lock:
+            timestamp = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+            self.console_messages.append({
+                'timestamp': timestamp,
+                'direction': direction,  # 'sent', 'received', 'info', 'error'
+                'message': message
+            })
+            # Keep only the last max_console_messages
+            if len(self.console_messages) > self.max_console_messages:
+                self.console_messages = self.console_messages[-self.max_console_messages:]
+    
     def get_buffer_lines(self, n=10):
         """Get the last n raw lines from the buffer."""
         return [item['line'] for item in self.raw_lines[-n:]]
@@ -479,6 +537,10 @@ class TCPCommunication(BaseCommunication):
     def is_connected_to_server(self):
         """Check if connected to the serial server."""
         return self.socket is not None and self.connection_status['connected']
+    
+    def is_connected(self):
+        """Alias for is_connected_to_server() for backward compatibility."""
+        return self.is_connected_to_server()
     
     def get_connection_status(self):
         """Get current connection status."""
@@ -523,240 +585,100 @@ class TCPCommunication(BaseCommunication):
             if not self.has_recent_data_for_sensor(sensor_name):
                 return pd.DataFrame()
             
-            # Create mock recent data points based on sensor activity
-            now = datetime.datetime.now()
-            timestamps = [now - datetime.timedelta(seconds=i*2) for i in range(15, 0, -1)]
-            
-            # Create simple mock data
-            data_points = []
-            for ts in timestamps:
-                data_points.append({
-                    'Time': ts,
-                    'value': 4.0  # Mock value - in real implementation would come from stored data
-                })
-            
-            return pd.DataFrame(data_points)
+            # Get data from buffer
+            with self.data_buffer_lock:
+                if sensor_name not in self.sensor_data_buffer or not self.sensor_data_buffer[sensor_name]:
+                    logger.debug(f"No buffered data for {sensor_name}")
+                    return pd.DataFrame()
+                
+                # Convert buffer data to DataFrame
+                data_points = []
+                for entry in self.sensor_data_buffer[sensor_name]:
+                    timestamp = entry['timestamp']
+                    values = entry['values']
+                    
+                    # Convert timestamp to datetime
+                    dt = datetime.datetime.fromtimestamp(timestamp)
+                    
+                    # Create data point with all values
+                    data_point = {'Time': dt}
+                    
+                    # Add each value from the values array
+                    # Most sensors have one value, but some may have multiple (e.g., accelerometer: x, y, z)
+                    if len(values) == 1:
+                        data_point['value'] = values[0]
+                    else:
+                        for i, val in enumerate(values):
+                            data_point[f'value_{i}'] = val
+                    
+                    data_points.append(data_point)
+                
+                logger.info(f"Returning {len(data_points)} real data points for {sensor_name}")
+                return pd.DataFrame(data_points)
                 
         except Exception as e:
             logger.error(f"Error getting sensor data for {sensor_name}: {e}")
             return pd.DataFrame()
-
-
-class CommunicationService:
-    """
-    High-level communication service that manages TCP or mock communication.
-    This is the main interface used by the application.
-    """
     
-    def __init__(self, config):
-        """
-        Initialize the communication service.
-        
-        Args:
-            config: CommunicationConfig object with settings
-        """
-        self.config = config
-        self.comm = None
-        
-        # Choose implementation based on config and environment
-        # Check if serial server mode is enabled (indicates we should use TCP)
-        serial_server_mode = os.environ.get('SERIAL_SERVER_MODE', 'false').lower() == 'true'
-        
-        # Get serial server connection details from environment
-        server_host = os.environ.get('SERIAL_SERVER_HOST', 'localhost')
-        server_port = int(os.environ.get('SERIAL_SERVER_PORT', '9999'))
-        
-        if serial_server_mode:
-            logger.info(f"Using TCPCommunication to connect to serial server at {server_host}:{server_port}")
-            # Don't check if server is running at startup - let TCPCommunication handle reconnection
-            # This is important for Docker environments where the server may not be immediately available
-            self.comm = TCPCommunication(
-                server_host=server_host,
-                server_port=server_port,
-                reconnect_delay=2.0
-            )
-        else:
-            logger.info(f"Using TCPCommunication to connect to serial server at {server_host}:{server_port}")
-            # For TCP communication, we connect to the serial server
-            # The serial server should already be running and connected to the actual serial port
-            self.comm = TCPCommunication(
-                server_host=server_host,
-                server_port=server_port,
-                reconnect_delay=2.0
-            )
-        
-        # Start communication if available
-        if self.comm:
-            self.comm.start()
-            logger.info("Communication service initialized and started")
-        else:
-            logger.warning("No communication interface available - running without hardware")
-    
-    def set_discovery_callback(self, callback):
-        """Set callback for sensor discovery."""
-        if self.comm:
-            return self.comm.set_discovery_callback(callback)
-        return False
-    
-    def register_data_callback(self, sensor_name, callback):
-        """Register callback for sensor data."""
-        if self.comm:
-            return self.comm.register_data_callback(sensor_name, callback)
-        return False
-    
-    def deregister_data_callback(self, sensor_name):
-        """Deregister callback for sensor data."""
-        if self.comm:
-            return self.comm.deregister_data_callback(sensor_name)
-        return False
-    
-    def register_callback(self, sensor_id, callback):
-        """Register callback for sensor data (legacy interface)."""
-        if self.comm:
-            return self.comm.register_callback(sensor_id, callback)
-        return False
-    
-    def deregister_callback(self, sensor_id):
-        """Deregister callback for sensor data (legacy interface)."""
-        if self.comm:
-            return self.comm.deregister_callback(sensor_id)
-        return False
-    
-    def get_discovered_sensors(self):
-        """Get list of discovered sensor names."""
-        if self.comm:
-            return self.comm.get_discovered_sensors()
-        return {}
-    
-    def get_buffer_lines(self, n=10):
-        """Get the last n lines from the buffer."""
-        if self.comm:
-            return self.comm.get_buffer_lines(n)
-        return []
-    
-    def is_connected_to_server(self):
-        """Check if connected to the serial server (TCP only)."""
-        if self.comm and hasattr(self.comm, 'is_connected_to_server'):
-            return self.comm.is_connected_to_server()
-        return False  # No communication available
-    
-    def get_connection_status(self):
-        """Get current connection status."""
-        if self.comm and hasattr(self.comm, 'get_connection_status'):
-            return self.comm.get_connection_status()
-        return {'connected': False, 'error': 'No communication interface available'}
-    
-    def is_connected(self) -> bool:
-        """Check if communication interface is connected."""
-        if not self.comm:
-            return False
-        return self.is_connected_to_server()
-    
-    def has_recent_data_for_sensor(self, sensor_name: str) -> bool:
-        """Check if sensor has recent data (within last 5 seconds)."""
-        if hasattr(self.comm, 'has_recent_data_for_sensor'):
-            return self.comm.has_recent_data_for_sensor(sensor_name)
-        return False
-    
-    def get_sensor_data_dataframe(self, sensor_name: str):
-        """Get recent sensor data as pandas DataFrame."""
-        if self.comm and hasattr(self.comm, 'get_sensor_data_dataframe'):
-            return self.comm.get_sensor_data_dataframe(sensor_name)
-        return None
-    
-    def close(self):
-        """Close and cleanup the communication service."""
-        if self.comm:
-            self.comm.close()
-            logger.info("Communication service closed")
-        else:
-            logger.info("No communication service to close")
-    
-
+    def clear_discovered_sensors(self) -> None:
+        """Clear all discovered sensors (used when switching microcontrollers)."""
+        self.discovered_sensors.clear()
+        logger.info("Cleared discovered sensors for microcontroller switch")
     
     def switch_to_hardware_mode(self, port: str, baud_rate: int) -> bool:
-        """Switch to hardware communication mode with specified port and baud rate."""
+        """
+        Switch to hardware communication mode with specified port and baud rate.
+        
+        Note: This sends a reconfiguration request to the serial server.
+        The serial server must support dynamic reconfiguration for this to work.
+        """
         try:
-            logger.info(f"Switching communication service to hardware mode: {port} at {baud_rate} baud")
-            
-            # Stop current communication
-            if self.comm:
-                self.comm.stop() 
-                self.comm.close()
-            
-            # Create new TCP communication to serial server
-            self.comm = TCPCommunication(
-                server_host='localhost',
-                server_port=9999,
-                reconnect_delay=2.0
-            )
-            self.comm.start()
-            
-            # Update config to reflect new mode
-            self.config.port = port
-            self.config.baudrate = baud_rate
+            logger.info(f"Requesting serial server to switch to: {port} at {baud_rate} baud")
             
             # Send reconfiguration message to serial server
-            success = self._reconfigure_serial_server(port, baud_rate)
+            request = {
+                'type': 'reconfigure_connection',
+                'port': port,
+                'baud_rate': baud_rate
+            }
+            response = self._send_request(request, timeout=10.0)
             
-            if success:
-                logger.info(f"Successfully switched to hardware mode: {port} at {baud_rate} baud")
-                return True
-            else:
-                logger.warning("Hardware mode switch partially successful - server reconfiguration pending")
-                # Even if reconfiguration fails initially, the TCP connection might work
-                # Let's check if we can at least connect to the server
-                if self.is_connected_to_server():
-                    logger.info("TCP connection established, hardware mode switch considered successful")
+            if response and response.get('type') == 'reconfigure_response':
+                success = response.get('success', False)
+                if success:
+                    logger.info(f"Successfully reconfigured serial server to {port} at {baud_rate} baud")
+                    # Clear discovered sensors when switching hardware
+                    self.clear_discovered_sensors()
                     return True
                 else:
-                    logger.error("Failed to establish TCP connection to serial server")
+                    error = response.get('error', 'Unknown error')
+                    logger.error(f"Failed to reconfigure serial server: {error}")
                     return False
+            else:
+                logger.warning("No response from serial server for reconfiguration request")
+                return False
                 
         except Exception as e:
             logger.error(f"Error switching to hardware mode: {e}")
             return False
     
-    def _reconfigure_serial_server(self, port: str, baud_rate: int) -> bool:
-        """Send reconfiguration request to serial server."""
-        try:
-            if hasattr(self.comm, '_send_request'):
-                request = {
-                    'type': 'reconfigure_connection',
-                    'port': port,
-                    'baud_rate': baud_rate
-                }
-                response = self.comm._send_request(request, timeout=10.0)
-                if response and response.get('type') == 'reconfigure_response':
-                    return response.get('success', False)
-            return False
-        except Exception as e:
-            logger.error(f"Error reconfiguring serial server: {e}")
-            return False
-    
     def get_current_mode(self) -> Dict:
-        """Get current communication mode and settings."""
-        # Determine if we're in mock mode based on actual communication type
-        is_mock = False
-        if self.comm:
-            comm_type = type(self.comm).__name__
-            is_mock = comm_type == 'MockCommunication'
-        
+        """Get current communication mode and settings from the serial server."""
         mode_info = {
-            'is_mock': is_mock,
-            'port': getattr(self.config, 'port', 'unknown'),
-            'baud_rate': getattr(self.config, 'baudrate', 115200),
+            'is_mock': False,  # We're always in TCP mode now
             'connected': self.is_connected_to_server()
         }
         
-        if hasattr(self.comm, 'get_connection_status'):
-            status = self.comm.get_connection_status()
-            mode_info.update(status)
+        # Try to get additional status from server
+        if self.is_connected_to_server():
+            try:
+                request = {'type': 'get_status'}
+                response = self._send_request(request, timeout=2.0)
+                if response and response.get('type') == 'status_response':
+                    mode_info['port'] = response.get('serial_port', 'unknown')
+                    mode_info['baud_rate'] = response.get('baud_rate', 115200)
+                    mode_info['serial_connected'] = response.get('serial_connected', False)
+            except Exception as e:
+                logger.debug(f"Could not get status from server: {e}")
         
         return mode_info
-    
-    def clear_discovered_sensors(self) -> None:
-        """Clear all discovered sensors (used when switching microcontrollers)."""
-        if hasattr(self.comm, 'discovered_sensors'):
-            self.comm.discovered_sensors.clear()
-            logger.info("Cleared discovered sensors for microcontroller switch")

@@ -19,7 +19,7 @@ def test_imports():
         from core.application import HyperloopGUIApplication
         print('✓ Application module imported successfully')
         
-        from services.communication_service import CommunicationService
+        from services.tcp_communication_service import CommunicationService
         print('✓ Communication service imported successfully')
         
         from services.sensor_service import SensorService

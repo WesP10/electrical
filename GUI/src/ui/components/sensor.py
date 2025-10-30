@@ -142,96 +142,56 @@ class SensorSelector:
         ], className="mb-3 shadow-sm")
 
 
-class MicrocontrollerIOMap:
-    """Microcontroller I/O pin mapping visualization component."""
+class TCPConsoleOutput:
+    """TCP Communication console output component for debugging."""
     
-    def __init__(self, sensor_names: List[str], has_connected_hardware: bool = False):
-        self.sensor_names = sensor_names
+    def __init__(self, has_connected_hardware: bool = False):
         self.has_connected_hardware = has_connected_hardware
-        # Define pin mappings (this would typically come from configuration)
-        self.pin_mappings = self._generate_pin_mappings(sensor_names) if has_connected_hardware else {}
-    
-    def _generate_pin_mappings(self, sensor_names: List[str]) -> Dict[str, Dict[str, Any]]:
-        """Generate pin mappings for sensors."""
-        # Example pin mapping - in a real application, this would come from config
-        pin_types = ['Analog', 'Digital', 'I2C', 'SPI', 'UART']
-        colors = ['primary', 'success', 'info', 'warning', 'secondary']
-        
-        mappings = {}
-        for idx, sensor in enumerate(sensor_names):
-            pin_type = pin_types[idx % len(pin_types)]
-            mappings[sensor] = {
-                'pin': f"A{idx}" if pin_type == 'Analog' else f"D{idx}",
-                'type': pin_type,
-                'color': colors[idx % len(colors)]
-            }
-        return mappings
     
     def create(self) -> dbc.Card:
-        """Create microcontroller I/O visualization card."""
-        # Check if we have pin mappings (hardware is connected)
-        if not self.pin_mappings or not self.has_connected_hardware:
-            # Show "no sensors connected" state
-            card_content = dbc.CardBody([
-                html.Div([
-                    html.I(className="fas fa-plug-circle-xmark fa-3x text-muted mb-3"),
-                    html.H6("No Hardware Detected", className="text-muted mb-2"),
-                    html.P(
-                        "Microcontroller I/O mapping will appear here when hardware is connected.",
-                        className="text-muted small mb-0",
-                        style={'fontSize': '0.8rem'}
-                    )
-                ], className="text-center py-4", id="io-mapping-grid")
-            ], className="p-3", style={'minHeight': '180px', 'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center'})
-        else:
-            # Create compact pin list with clean professional design
-            pin_elements = []
-            for sensor, info in self.pin_mappings.items():
-                pin_row = html.Div([
-                    html.Div([
-                        dbc.Badge(
-                            info['pin'],
-                            color=info['color'],
-                            className="fw-bold",
-                            style={'fontSize': '0.7rem', 'padding': '0.25rem 0.5rem', 'minWidth': '32px', 'textAlign': 'center'}
-                        )
-                    ], style={'width': '45px', 'flexShrink': '0'}),
-                    html.Div([
-                        html.Span(sensor, className="fw-semibold", style={'fontSize': '0.875rem'})
-                    ], className="flex-grow-1 px-2"),
-                    html.Div([
-                        html.Span(
-                            info['type'],
-                            className="text-muted small",
-                            style={'fontSize': '0.75rem'}
-                        )
-                    ], style={'width': '60px', 'textAlign': 'right', 'flexShrink': '0'})
-                ], className="d-flex align-items-center py-1 px-2 mb-1 io-pin-row",
-                   style={
-                       'borderLeft': f'3px solid var(--bs-{info["color"]})',
-                       'backgroundColor': '#fafafa',
-                       'borderRadius': '3px',
-                       'transition': 'all 0.2s ease'
-                   })
-                
-                pin_elements.append(pin_row)
-            
-            card_content = dbc.CardBody([
+        """Create TCP communication console card."""
+        # Console content with scrollable output and auto-scroll
+        card_content = dbc.CardBody([
+            html.Div([
                 html.Div(
-                    pin_elements,
-                    id="io-mapping-grid",
-                    className="compact-io-list"
+                    id="tcp-console-output",
+                    children=[
+                        html.Div(
+                            "Waiting for TCP communication data..." if self.has_connected_hardware 
+                            else "No connection to serial server. Start serial server to see data.",
+                            className="text-muted small",
+                            style={'fontFamily': 'monospace', 'fontSize': '0.75rem'}
+                        )
+                    ],
+                    style={
+                        'backgroundColor': '#1e1e1e',
+                        'color': '#d4d4d4',
+                        'fontFamily': 'Consolas, Monaco, "Courier New", monospace',
+                        'fontSize': '0.75rem',
+                        'padding': '10px',
+                        'borderRadius': '4px',
+                        'maxHeight': '300px',
+                        'minHeight': '300px',
+                        'overflowY': 'auto',
+                        'overflowX': 'hidden',
+                        'wordWrap': 'break-word',
+                        'display': 'flex',
+                        'flexDirection': 'column'  # Normal direction, newest at bottom
+                    }
                 )
-            ], className="p-2", style={'maxHeight': '220px', 'overflowY': 'auto'})
+            ])
+        ], className="p-2")
         
         return dbc.Card([
             dbc.CardHeader([
                 html.Div([
-                    html.H5("I/O Mapping", className="mb-0 d-inline", style={'fontSize': '1rem'})
-                ])
+                    html.I(className="fas fa-terminal me-2"),
+                    html.H5("TCP Communication Console", className="mb-0 d-inline", style={'fontSize': '1rem'}),
+                    html.Small(" (Real-time)", className="text-muted ms-2", style={'fontSize': '0.7rem'})
+                ], className="d-flex align-items-center")
             ], className="py-2"),
             card_content
-        ], className="mb-3 shadow-sm", id="io-map-card")
+        ], className="mb-3 shadow-sm", id="tcp-console-card")
 
 
 class SensorSummary:

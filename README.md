@@ -175,11 +175,20 @@ GUI/
 
 **Current Active Stack:**
 - **Frontend**: Python Dash, Dash Bootstrap Components, Plotly
-- **Communication**: PySerial with universal auto-detection across all platforms
+- **Communication**: TCP-based serial server bridge (no mock modes, no abstractions)
+  - Serial Server: PySerial + TCP server on host machine (port 9999)
+  - GUI Client: Direct TCP client connection from Docker/local
+  - Protocol: JSON over TCP for sensor discovery and data streaming
 - **Data Processing**: Pandas, NumPy
 - **Deployment**: Docker with serial server bridge architecture
-- **Configuration**: Centralized config system with automatic path resolution
-- **Development**: Universal serial server with intelligent device detection
+- **Configuration**: Centralized config system with environment variables
+- **Development**: Clean, single-backend architecture for easy debugging
+
+**Architecture Philosophy:**
+- **No Mock Modes**: Always use real TCP connection to serial server
+- **No Abstractions**: Single `CommunicationService` class, no wrapper layers
+- **Docker-First**: Designed for containerized deployment
+- **Clean & Debuggable**: Simple code flow from Arduino → Serial Server → TCP → GUI → Graph
 
 **Legacy Stack (Preserved):**
 - **Previous GUI**: PyQt5, PyQtGraph
@@ -277,10 +286,16 @@ The GUI has been optimized for Docker deployment with the following changes:
 
 **Key Docker Changes:**
 1. **Single Entry Point**: Only `src/app.py` is used (no complex launchers in Docker)
-2. **No Device Detection**: Mock communication is the default in containers
+2. **TCP-Only Communication**: Direct TCP connection to serial server (no mock mode)
 3. **Docker-First**: Optimized for containerized deployment
 4. **Simplified Configuration**: Environment variable driven
 5. **No OS Detection**: Works on any platform via Docker
+
+**Clean Architecture (October 2025):**
+- **Removed**: communication_service.py wrapper (unnecessary abstraction)
+- **Removed**: Mock communication modes (use real serial server only)
+- **Removed**: BaseCommunication abstract class (single implementation)
+- **Result**: One class (`CommunicationService`), one backend (TCP), easy to debug
 
 **Removed Files (Docker Cleanup):**
 - `run.py` - Complex intelligent launcher (replaced by Docker entry point)
@@ -289,6 +304,7 @@ The GUI has been optimized for Docker deployment with the following changes:
 - `config/run.bat` - Batch launcher
 - `config/run.sh` - Shell launcher script
 - `serial_server.log` - Old log file
+- `services/communication_service.py` - Wrapper abstraction (deprecated)
 - `**/__pycache__/` - Python bytecode cache directories
 
 ## Migration Notes

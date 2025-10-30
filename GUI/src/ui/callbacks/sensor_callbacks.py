@@ -1,4 +1,4 @@
-﻿"""Sensor-related callbacks."""
+"""Sensor-related callbacks."""
 from dash.dependencies import Input, Output
 from dash import html, dcc
 import pandas as pd
@@ -7,6 +7,7 @@ import plotly.graph_objs as go
 import dash_bootstrap_components as dbc
 import datetime
 import numpy as np
+import json
 
 from core.dependencies import container
 from services.sensor_service import SensorService
@@ -29,6 +30,7 @@ class SensorCallbacks:
     def register(self, app) -> None:
         """Register sensor-related callbacks."""
         self._register_sensor_update_callback(app)
+        self._register_tcp_console_callback(app)
     
     def _register_sensor_update_callback(self, app) -> None:
         """Register periodic sensor data update callback."""
@@ -140,7 +142,7 @@ class SensorCallbacks:
                         html.Span("Active", className="text-muted"),
                         html.Div([
                             html.H5(str(active), className="mb-0 mt-1 fw-bold text-success d-inline me-2"),
-                            dbc.Badge("●", color="success", className="align-middle")
+                            dbc.Badge("?", color="success", className="align-middle")
                         ])
                     ], className="mb-3")
                 ]),
@@ -151,7 +153,7 @@ class SensorCallbacks:
                         html.Span("Inactive", className="text-muted"),
                         html.Div([
                             html.H5(str(inactive), className="mb-0 mt-1 fw-bold text-secondary d-inline me-2"),
-                            dbc.Badge("●", color="secondary", className="align-middle")
+                            dbc.Badge("?", color="secondary", className="align-middle")
                         ])
                     ], className="mb-2")
                 ]),
@@ -187,9 +189,9 @@ class SensorCallbacks:
         graphs = []
         
         if is_available and data is not None and not data.empty:
-            # Create a graph for each data field
+            # Create a graph for each data field using REAL DATA
             for field in data_fields:
-                fig = self._create_sensor_field_graph(sensor_name, field, units.get(field, ''), sensor_id)
+                fig = self._create_sensor_field_graph(sensor_name, field, units.get(field, ''), sensor_id, data)
                 graphs.append(
                     html.Div([
                         dcc.Graph(
@@ -247,89 +249,69 @@ class SensorCallbacks:
         ], className="mb-3")
     
     def _create_sensor_graph(self, sensor_name: str, data: pd.DataFrame, sensor_id: str) -> go.Figure:
-        """Create a proper graph for sensor data."""
-        
-        # Generate time series data (simulate recent readings)
-        now = datetime.datetime.now()
-        time_points = [now - datetime.timedelta(seconds=i*2) for i in range(30, 0, -1)]
-        
-        # Generate realistic sensor data based on sensor type
-        if 'temperature' in sensor_name.lower() or 'thermistor' in sensor_name.lower():
-            # Temperature data (20-35°C with noise)
-            values = 25 + 5 * np.sin(np.linspace(0, 2*np.pi, 30)) + np.random.normal(0, 0.5, 30)
-            y_title = "Temperature (°C)"
-            color = '#d63384'  # Pink for temperature
-        elif 'pressure' in sensor_name.lower():
-            # Pressure data (990-1020 hPa)
-            values = 1005 + 10 * np.sin(np.linspace(0, np.pi, 30)) + np.random.normal(0, 1, 30)
-            y_title = "Pressure (hPa)"
-            color = '#0d6efd'  # Blue for pressure
-        elif 'ultrasonic' in sensor_name.lower() or 'distance' in sensor_name.lower():
-            # Distance data (5-25 cm)
-            values = 15 + 8 * np.sin(np.linspace(0, 3*np.pi, 30)) + np.random.normal(0, 0.3, 30)
-            values = np.clip(values, 2, 30)  # Keep realistic range
-            y_title = "Distance (cm)"
-            color = '#198754'  # Green for distance
-        elif 'accelerometer' in sensor_name.lower() or 'accel' in sensor_name.lower():
-            # Acceleration data (-2 to 2 g)
-            values = 0.5 * np.sin(np.linspace(0, 4*np.pi, 30)) + np.random.normal(0, 0.1, 30)
-            y_title = "Acceleration (g)"
-            color = '#fd7e14'  # Orange for acceleration
-        elif 'vibration' in sensor_name.lower():
-            # Vibration amplitude (0-5)
-            values = 2 + 1.5 * np.abs(np.sin(np.linspace(0, 6*np.pi, 30))) + np.random.normal(0, 0.2, 30)
-            y_title = "Vibration (units)"
-            color = '#dc3545'  # Red for vibration
-        elif 'line' in sensor_name.lower():
-            # Line sensor (0-1 binary + noise)
-            base_values = np.random.choice([0, 1], 30, p=[0.7, 0.3])
-            values = base_values + np.random.normal(0, 0.1, 30)
-            y_title = "Line Detection"
-            color = '#6f42c1'  # Purple for line sensor
-        elif 'proximity' in sensor_name.lower():
-            # Proximity sensor (0-10)
-            values = 5 + 3 * np.sin(np.linspace(0, 2*np.pi, 30)) + np.random.normal(0, 0.3, 30)
-            values = np.clip(values, 0, 10)
-            y_title = "Proximity (units)"
-            color = '#20c997'  # Teal for proximity
-        elif 'servo' in sensor_name.lower():
-            # Servo angle (0-180 degrees)
-            values = 90 + 45 * np.sin(np.linspace(0, np.pi, 30)) + np.random.normal(0, 2, 30)
-            values = np.clip(values, 0, 180)
-            y_title = "Angle (degrees)"
-            color = '#ffc107'  # Yellow for servo
-        elif 'relay' in sensor_name.lower():
-            # Relay state (0-1)
-            values = np.random.choice([0, 1], 30, p=[0.6, 0.4])
-            y_title = "Relay State"
-            color = '#6c757d'  # Gray for relay
-        elif 'gps' in sensor_name.lower():
-            # GPS coordinate change (simulate small movements)
-            values = np.cumsum(np.random.normal(0, 0.001, 30))
-            y_title = "Position Change"
-            color = '#0dcaf0'  # Cyan for GPS
-        else:
-            # Default sensor data
-            values = 50 + 20 * np.sin(np.linspace(0, 2*np.pi, 30)) + np.random.normal(0, 2, 30)
-            y_title = "Value"
-            color = '#495057'  # Dark gray default
+        """Create a proper graph for sensor data using actual values from TCP."""
         
         # Create the plot
         fig = go.Figure()
         
-        # Add the main trace
-        fig.add_trace(go.Scatter(
-            x=time_points,
-            y=values,
-            mode='lines+markers',
-            name=sensor_name,
-            line=dict(color=color, width=2),
-            marker=dict(size=4, color=color),
-            hovertemplate='<b>%{fullData.name}</b><br>' +
-                         'Time: %{x}<br>' +
-                         'Value: %{y:.2f}<br>' +
-                         '<extra></extra>'
-        ))
+        # Check if we have actual data
+        if data is not None and not data.empty and 'Time' in data.columns:
+            # Use actual data from the DataFrame
+            time_points = data['Time']
+            
+            # Determine which value column(s) to plot
+            value_columns = [col for col in data.columns if col.startswith('value')]
+            
+            if value_columns:
+                for col in value_columns:
+                    values = data[col]
+                    
+                    # Determine color and y-axis label based on sensor type
+                    y_title, color = self._get_sensor_display_info(sensor_name)
+                    
+                    # Add the trace with actual data
+                    fig.add_trace(go.Scatter(
+                        x=time_points,
+                        y=values,
+                        mode='lines+markers',
+                        name=col if len(value_columns) > 1 else sensor_name,
+                        line=dict(color=color, width=2),
+                        marker=dict(size=4, color=color),
+                        hovertemplate='<b>%{fullData.name}</b><br>' +
+                                     'Time: %{x}<br>' +
+                                     'Value: %{y:.2f}<br>' +
+                                     '<extra></extra>'
+                    ))
+                
+                logger.info(f"Plotted {len(values)} real data points for {sensor_name}")
+            else:
+                # No value columns found
+                y_title = "Value"
+                color = '#495057'
+        else:
+            # No data available - show empty state
+            y_title = "Value"
+            color = '#495057'
+            time_points = []
+            values = []
+            
+            fig.add_trace(go.Scatter(
+                x=[],
+                y=[],
+                mode='lines',
+                name=sensor_name
+            ))
+            
+            fig.add_annotation(
+                text="Waiting for data...",
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=0.5,
+                showarrow=False,
+                font=dict(size=14, color="gray"),
+                align="center"
+            )
         
         # Update layout for professional look with uirevision to preserve zoom/pan
         fig.update_layout(
@@ -364,6 +346,33 @@ class SensorCallbacks:
         )
         
         return fig
+    
+    def _get_sensor_display_info(self, sensor_name: str):
+        """Get appropriate y-axis label and color based on sensor type."""
+        sensor_lower = sensor_name.lower()
+        
+        if 'temperature' in sensor_lower or 'thermistor' in sensor_lower:
+            return "Temperature (°C)", '#d63384'  # Pink
+        elif 'pressure' in sensor_lower:
+            return "Pressure (hPa)", '#0d6efd'  # Blue
+        elif 'ultrasonic' in sensor_lower or 'distance' in sensor_lower:
+            return "Distance (cm)", '#198754'  # Green
+        elif 'accelerometer' in sensor_lower or 'accel' in sensor_lower:
+            return "Acceleration (g)", '#fd7e14'  # Orange
+        elif 'vibration' in sensor_lower:
+            return "Vibration (units)", '#dc3545'  # Red
+        elif 'line' in sensor_lower:
+            return "Line Detection", '#6f42c1'  # Purple
+        elif 'proximity' in sensor_lower:
+            return "Proximity (units)", '#20c997'  # Teal
+        elif 'servo' in sensor_lower:
+            return "Angle (degrees)", '#ffc107'  # Yellow
+        elif 'relay' in sensor_lower:
+            return "Relay State", '#6c757d'  # Gray
+        elif 'gps' in sensor_lower:
+            return "Position", '#0dcaf0'  # Cyan
+        else:
+            return "Value", '#495057'  # Dark gray default
     
     def _create_empty_graph(self, sensor_name: str) -> go.Figure:
         """Create an empty state graph for inactive sensors."""
@@ -472,34 +481,77 @@ class SensorCallbacks:
             ])
         ], className="mb-3")
     
-    def _create_sensor_field_graph(self, sensor_name: str, field: str, unit: str, sensor_id: str) -> go.Figure:
-        """Create a graph for a specific sensor data field."""
-        # Generate time series data (simulate recent readings)
-        now = datetime.datetime.now()
-        time_points = [now - datetime.timedelta(seconds=i*2) for i in range(30, 0, -1)]
-        
-        # Generate realistic sensor data based on field name and sensor type
-        values = self._generate_field_data(field, sensor_name, sensor_id)
-        
-        # Determine color based on field type
-        color = self._get_field_color(field)
+    def _create_sensor_field_graph(self, sensor_name: str, field: str, unit: str, sensor_id: str, data: pd.DataFrame = None) -> go.Figure:
+        """Create a graph for a specific sensor data field using REAL DATA."""
         
         # Create the plot
         fig = go.Figure()
         
-        # Add the main trace
-        fig.add_trace(go.Scatter(
-            x=time_points,
-            y=values,
-            mode='lines+markers',
-            name=f"{field}",
-            line=dict(color=color, width=2),
-            marker=dict(size=4, color=color),
-            hovertemplate=f'<b>{field}</b><br>' +
-                         'Time: %{x}<br>' +
-                         f'Value: %{{y:.2f}} {unit}<br>' +
-                         '<extra></extra>'
-        ))
+        # Check if we have actual data
+        if data is not None and not data.empty and 'Time' in data.columns:
+            # Use actual data from the DataFrame
+            time_points = data['Time']
+            
+            # Get the value column (for single-field sensors, it's 'value')
+            if 'value' in data.columns:
+                values = data['value']
+            elif f'value_0' in data.columns:
+                values = data[f'value_0']
+            else:
+                # No data available
+                time_points = []
+                values = []
+            
+            if len(values) > 0:
+                # Determine color based on field type
+                color = self._get_field_color(field)
+                
+                # Add the trace with REAL data
+                fig.add_trace(go.Scatter(
+                    x=time_points,
+                    y=values,
+                    mode='lines+markers',
+                    name=f"{field}",
+                    line=dict(color=color, width=2),
+                    marker=dict(size=4, color=color),
+                    hovertemplate=f'<b>{field}</b><br>' +
+                                 'Time: %{x}<br>' +
+                                 f'Value: %{{y:.2f}} {unit}<br>' +
+                                 '<extra></extra>'
+                ))
+                
+                logger.info(f"Plotted {len(values)} real data points for {sensor_name} - {field}")
+            else:
+                # Show waiting message
+                fig.add_annotation(
+                    text="Waiting for data...",
+                    xref="paper",
+                    yref="paper",
+                    x=0.5,
+                    y=0.5,
+                    showarrow=False,
+                    font=dict(size=14, color="gray"),
+                    align="center"
+                )
+        else:
+            # No data available - show empty state
+            fig.add_trace(go.Scatter(
+                x=[],
+                y=[],
+                mode='lines',
+                name=field
+            ))
+            
+            fig.add_annotation(
+                text="Waiting for data...",
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=0.5,
+                showarrow=False,
+                font=dict(size=14, color="gray"),
+                align="center"
+            )
         
         # Update layout for professional look with uirevision to preserve zoom/pan
         fig.update_layout(
@@ -599,7 +651,7 @@ class SensorCallbacks:
             values = 15 + 8 * np.sin(np.linspace(0, 3*np.pi, 30)) + np.random.normal(0, 0.3, 30)
             return np.clip(values, 2, 30)
         elif field.lower() in ['temperature', 'temp']:
-            # Temperature data (20-35°C)
+            # Temperature data (20-35�C)
             values = 25 + 5 * np.sin(np.linspace(0, 2*np.pi, 30)) + np.random.normal(0, 0.5, 30)
             return values
         elif field.lower() in ['pressure']:
@@ -668,3 +720,126 @@ class SensorCallbacks:
             return '#198754'  # Green
         else:
             return '#495057'  # Dark gray default
+    
+    def _register_tcp_console_callback(self, app) -> None:
+        """Register TCP console output update callback."""
+        @app.callback(
+            Output('tcp-console-output', 'children'),
+            [Input('sensor-update-interval', 'n_intervals')]
+        )
+        def update_tcp_console(n_intervals):
+            """Update TCP console with recent communication messages."""
+            try:
+                # Get TCP communication service
+                from services.tcp_communication_service import CommunicationService
+                tcp_service = container.get(CommunicationService)
+                
+                # Get recent console messages
+                messages = tcp_service.get_console_messages(n=50)
+                
+                if not messages:
+                    return html.Div([
+                        html.Div(
+                            "No TCP communication data yet...",
+                            className="text-muted",
+                            style={'fontFamily': 'monospace', 'fontSize': '0.75rem'}
+                        )
+                    ])
+                
+                # Keep messages in chronological order (oldest first, newest last)
+                
+                # Format messages for display
+                console_lines = []
+                for msg in messages:
+                    timestamp = msg['timestamp']
+                    direction = msg['direction']
+                    message = msg['message']
+                    
+                    # Determine prefix and color based on direction
+                    if direction == 'sent':
+                        prefix = 'SEND'
+                        color = '#4ec9b0'  # Teal for sent
+                    elif direction == 'received':
+                        prefix = 'RECV'
+                        color = '#569cd6'  # Blue for received
+                    elif direction == 'error':
+                        prefix = 'ERROR'
+                        color = '#f48771'  # Red for errors
+                    else:
+                        prefix = 'INFO'
+                        color = '#dcdcaa'  # Yellow for info
+                    
+                    # Format JSON for better readability if it's a JSON message
+                    display_message = message
+                    try:
+                        # Try to parse and pretty print JSON
+                        if message.startswith('{') or message.startswith('['):
+                            parsed = json.loads(message)
+                            # Create a compact but readable format
+                            msg_type = parsed.get('type', 'unknown')
+                            
+                            # Simplify display based on message type
+                            if msg_type == 'periodic_update':
+                                data_count = len(parsed.get('data', []))
+                                display_message = f'{{"type": "periodic_update", "data_count": {data_count}}}'
+                            elif msg_type == 'get_data':
+                                display_message = f'{{"type": "get_data", "request_id": {parsed.get("request_id", "?")}}}'
+                            elif msg_type == 'data_response':
+                                data_count = len(parsed.get('data', []))
+                                display_message = f'{{"type": "data_response", "data_count": {data_count}, "request_id": {parsed.get("request_id", "?")}}}'
+                            elif msg_type == 'server_status':
+                                serial_conn = parsed.get('serial_connected', False)
+                                sensor_count = len(parsed.get('discovered_sensors', []))
+                                display_message = f'{{"type": "server_status", "serial_connected": {str(serial_conn).lower()}, "sensors": {sensor_count}}}'
+                            else:
+                                # For other types, show compact version
+                                display_message = json.dumps(parsed, separators=(',', ':'))[:100]
+                                if len(json.dumps(parsed)) > 100:
+                                    display_message += '...'
+                    except:
+                        # Not JSON or parsing failed, keep original
+                        pass
+                    
+                    # Create formatted line
+                    console_lines.append(
+                        html.Div([
+                            html.Span(f"{timestamp} ", style={'color': '#858585'}),
+                            html.Span(f"[{prefix:5}] ", style={'color': color, 'fontWeight': 'bold'}),
+                            html.Span(display_message, style={'color': '#d4d4d4'})
+                        ], style={
+                            'fontFamily': 'Consolas, Monaco, "Courier New", monospace',
+                            'fontSize': '0.75rem',
+                            'marginBottom': '2px',
+                            'lineHeight': '1.4'
+                        })
+                    )
+                
+                # Add a scroll anchor at the end to ensure auto-scroll
+                console_lines.append(
+                    html.Div(id='console-scroll-anchor', style={'height': '1px'})
+                )
+                
+                # Return with unique key to force update and scroll
+                return html.Div([
+                    html.Div(console_lines),
+                    html.Script(
+                        f"""
+                        setTimeout(function() {{
+                            var console = document.getElementById('tcp-console-output');
+                            if (console) {{
+                                console.scrollTop = console.scrollHeight;
+                            }}
+                        }}, 50);
+                        """
+                    )
+                ])
+                
+            except Exception as e:
+                logger.error(f"Error updating TCP console: {e}", exc_info=True)
+                return html.Div([
+                    html.Div(
+                        f"Error loading console: {e}",
+                        className="text-danger",
+                        style={'fontFamily': 'monospace', 'fontSize': '0.75rem'}
+                    )
+                ])

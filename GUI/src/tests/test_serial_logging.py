@@ -13,7 +13,7 @@ from pathlib import Path
 gui_dir = Path(__file__).parent
 sys.path.insert(0, str(gui_dir / "src"))
 
-from services.communication_service import PySerialCommunication
+from services.tcp_communication_service import PySerialCommunication
 from config.log_config import setup_logging
 
 def main():

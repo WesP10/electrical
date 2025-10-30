@@ -4,7 +4,7 @@ import os
 import importlib
 from typing import List, Type
 from .base_sensor import BaseSensor
-from services.communication_service import CommunicationService
+from services.tcp_communication_service import CommunicationService
 import sys
 from pathlib import Path
 # Use PYTHONPATH for imports

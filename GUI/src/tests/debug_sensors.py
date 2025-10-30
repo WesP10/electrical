@@ -10,7 +10,7 @@ gui_dir = Path(__file__).parent
 src_dir = gui_dir / "src"
 sys.path.insert(0, str(src_dir))
 
-from services.communication_service import CommunicationService
+from services.tcp_communication_service import CommunicationService
 from services.sensor_service import SensorService
 from config.settings import load_config
 

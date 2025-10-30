@@ -3,10 +3,10 @@ from dash import html
 import dash_bootstrap_components as dbc
 from typing import Dict, Any
 
-from ui.components.sensor import SensorGrid, SensorSelector, SensorSummary, MicrocontrollerIOMap
+from ui.components.sensor import SensorGrid, SensorSelector, SensorSummary, TCPConsoleOutput
 from ui.components.common import IntervalComponent
 from core.dependencies import container
-from services.communication_service import CommunicationService
+from services.tcp_communication_service import CommunicationService
 from config.log_config import get_logger
 
 logger = get_logger(__name__)
@@ -29,7 +29,7 @@ class SensorDashboardPage:
             logger.warning(f"Could not determine connection status: {e}")
             has_connected_hardware = False
         
-        self.io_map = MicrocontrollerIOMap(sensor_names, has_connected_hardware=has_connected_hardware)
+        self.tcp_console = TCPConsoleOutput(has_connected_hardware=has_connected_hardware)
         
         # Add all sensors to grid initially
         for sensor_name in sensor_names:
@@ -38,12 +38,12 @@ class SensorDashboardPage:
     def create_layout(self) -> html.Div:
         """Create the sensor dashboard layout."""
         return dbc.Container([
-            # Top row: Left column (filter + I/O map) and Right column (summary)
+            # Top row: Left column (filter + TCP console) and Right column (summary)
             dbc.Row([
-                # Left column: Sensor filter and I/O mapping stacked
+                # Left column: Sensor filter and TCP console stacked
                 dbc.Col([
                     self.sensor_selector.create(),
-                    self.io_map.create()
+                    self.tcp_console.create()
                 ], width=12, lg=8, className="mb-3 mb-lg-0"),
                 
                 # Right column: Sensor summary (matches combined height of left)
