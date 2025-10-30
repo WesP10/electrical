@@ -725,9 +725,10 @@ class SensorCallbacks:
         """Register TCP console output update callback."""
         @app.callback(
             Output('tcp-console-output', 'children'),
-            [Input('sensor-update-interval', 'n_intervals')]
+            [Input('sensor-update-interval', 'n_intervals'),
+             Input('tcp-console-autoscroll', 'value')]
         )
-        def update_tcp_console(n_intervals):
+        def update_tcp_console(n_intervals, autoscroll_enabled):
             """Update TCP console with recent communication messages."""
             try:
                 # Get TCP communication service
@@ -819,20 +820,25 @@ class SensorCallbacks:
                     html.Div(id='console-scroll-anchor', style={'height': '1px'})
                 )
                 
-                # Return with unique key to force update and scroll
-                return html.Div([
-                    html.Div(console_lines),
-                    html.Script(
-                        f"""
-                        setTimeout(function() {{
-                            var console = document.getElementById('tcp-console-output');
-                            if (console) {{
-                                console.scrollTop = console.scrollHeight;
-                            }}
-                        }}, 50);
-                        """
-                    )
-                ])
+                # Return with optional auto-scroll based on checkbox
+                console_div = html.Div(console_lines)
+                
+                if autoscroll_enabled:
+                    return html.Div([
+                        console_div,
+                        html.Script(
+                            f"""
+                            setTimeout(function() {{
+                                var console = document.getElementById('tcp-console-output');
+                                if (console) {{
+                                    console.scrollTop = console.scrollHeight;
+                                }}
+                            }}, 50);
+                            """
+                        )
+                    ])
+                else:
+                    return console_div
                 
             except Exception as e:
                 logger.error(f"Error updating TCP console: {e}", exc_info=True)
