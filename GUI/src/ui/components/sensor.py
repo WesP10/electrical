@@ -185,10 +185,18 @@ class TCPConsoleOutput:
         return dbc.Card([
             dbc.CardHeader([
                 html.Div([
-                    html.I(className="fas fa-terminal me-2"),
-                    html.H5("TCP Communication Console", className="mb-0 d-inline", style={'fontSize': '1rem'}),
-                    html.Small(" (Real-time)", className="text-muted ms-2", style={'fontSize': '0.7rem'})
-                ], className="d-flex align-items-center")
+                    html.Div([
+                        html.I(className="fas fa-terminal me-2"),
+                        html.H5("TCP Communication Console", className="mb-0 d-inline", style={'fontSize': '1rem'}),
+                        html.Small(" (Real-time)", className="text-muted ms-2", style={'fontSize': '0.7rem'})
+                    ]),
+                    dbc.Checkbox(
+                        id="tcp-console-autoscroll",
+                        label="Auto-scroll",
+                        value=True,
+                        className="form-check-inline"
+                    )
+                ], className="d-flex align-items-center justify-content-between")
             ], className="py-2"),
             card_content
         ], className="mb-3 shadow-sm", id="tcp-console-card")
