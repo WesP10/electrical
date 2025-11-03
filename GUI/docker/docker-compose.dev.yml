@@ -2,6 +2,7 @@ services:
   hyperloop-gui:
     environment:
       - DASH_DEBUG=true
+      - USE_MOCK_COMMUNICATION=true
     volumes:
       - ..:/app
       - /app/__pycache__  # Exclude pycache from mounting

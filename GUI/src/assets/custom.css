@@ -1,0 +1,277 @@
+/* Custom styles for Cornell Hyperloop Dashboard */
+
+/* Sidebar navigation styles */
+#sidebar {
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+}
+
+#sidebar .nav-link {
+    border-radius: 5px;
+    margin-bottom: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+#sidebar .nav-link:hover {
+    background-color: #e9ecef;
+    transform: translateX(5px);
+}
+
+#sidebar .nav-link.active {
+    background-color: #007bff;
+    color: white !important;
+}
+
+#sidebar .nav-link.active:hover {
+    background-color: #0056b3;
+}
+
+/* Critical navigation items (emergency) */
+#sidebar .nav-link.text-danger:hover {
+    background-color: #f8d7da;
+}
+
+#sidebar .nav-link.text-danger.active {
+    background-color: #dc3545;
+    color: white !important;
+}
+
+/* Main content area */
+#page-content {
+    min-height: calc(100vh - 56px);
+    background-color: #ffffff;
+}
+
+/* Navigation bar enhancements */
+.navbar {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 768px) {
+    #sidebar {
+        width: 12rem !important;
+        padding: 1rem 0.5rem;
+    }
+    
+    #page-content {
+        margin-left: 14rem !important;
+        margin-right: 1rem !important;
+    }
+    
+    #sidebar h4 {
+        font-size: 1rem;
+    }
+}
+
+/* Card styling improvements */
+.card {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Status badge styling */
+#system-status-badge {
+    font-size: 0.9rem;
+    padding: 0.4rem 0.8rem;
+}
+
+/* Smooth page transitions */
+#page-content > div {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Sensor Summary Card Enhancements */
+#sensor-summary-card {
+    border-left: 4px solid #007bff;
+}
+
+#sensor-summary-card .card-body {
+    background: linear-gradient(135deg, #ffffff 0%, #f0f5ff 100%);
+}
+
+/* Profile Page Enhancements */
+.hover-lift {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2) !important;
+}
+
+#profile-status-card {
+    border-left: 4px solid #28a745;
+}
+
+#profile-status-card .card-body {
+    background: linear-gradient(135deg, #ffffff 0%, #f0f9f4 100%);
+}
+
+#profile-history-card {
+    border-left: 4px solid #6c757d;
+}
+
+#profile-history-card li {
+    padding: 0.25rem 0;
+    color: #495057;
+}
+
+/* Profile output alert animation */
+#profile-output {
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* I/O Mapping Card Enhancements */
+#io-map-card {
+    border-left: 4px solid #17a2b8;
+}
+
+#io-map-card .card-header {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    color: white;
+}
+
+#io-map-card .card-body {
+    background: #ffffff;
+}
+
+/* I/O Pin Row Styling */
+.io-pin-row:hover {
+    background-color: #e8f5f7 !important;
+    transform: translateX(2px);
+    box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.08);
+    cursor: default;
+}
+
+/* Compact I/O list styling */
+.compact-io-list {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+/* Scrollbar styling for I/O mapping */
+#io-map-card .card-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+#io-map-card .card-body::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+#io-map-card .card-body::-webkit-scrollbar-thumb {
+    background: #17a2b8;
+    border-radius: 3px;
+}
+
+#io-map-card .card-body::-webkit-scrollbar-thumb:hover {
+    background: #138496;
+}
+
+/* Grid layout improvements */
+#sensor-dashboard-page .row {
+    margin-left: -0.75rem;
+    margin-right: -0.75rem;
+}
+
+#sensor-dashboard-page .row > [class*='col-'] {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+}
+
+/* Ensure summary card fills height without extra bottom space */
+#sensor-summary-card.h-100 {
+    display: flex;
+    flex-direction: column;
+}
+
+#sensor-summary-card.h-100 .card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Sensor summary typography improvements */
+#sensor-summary-card .card-body > div {
+    flex-shrink: 0;
+}
+
+#sensor-summary-card h4,
+#sensor-summary-card h5 {
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+#sensor-summary-card .small {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Sensor selector card */
+.card .dropdown {
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+}
+
+.card .dropdown:focus-within {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Sensor filter card header */
+#sensor-dashboard-page .card-header h5 {
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+}
+
+/* Sensor Data Section Header */
+#sensor-dashboard-page h4 {
+    color: #495057;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+}
+
+/* Professional grid balance */
+@media (min-width: 992px) {
+    #sensor-summary-card {
+        min-height: 450px;
+    }
+}
+
+/* Card shadows and hover effects */
+.shadow-sm {
+    box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.08) !important;
+}
+
+.shadow-sm:hover {
+    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.12) !important;
+}
+

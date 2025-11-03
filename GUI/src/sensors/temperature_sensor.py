@@ -1,5 +1,5 @@
 from .base_sensor import BaseSensor
-from services.communication_service import CommunicationService
+from services.tcp_communication_service import CommunicationService
 from typing import List, Dict
 
 class Sensor(BaseSensor):

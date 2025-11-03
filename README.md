@@ -15,49 +15,84 @@ This repository contains the electrical team's code, documentation, and resource
 
 ## Quick Start
 
-### For New Team Members (Launcher - Recommended)
-**One-command setup with automatic hardware detection:**
+### Option 1: Docker (Recommended)
+**Simple setup with containerized deployment:**
 
 ```bash
+# Start Docker GUI (sensors will show "No Hardware" without serial server)
 cd GUI
-python run.py
+docker-compose -f docker/docker-compose.yml up --build
+# Access at: http://localhost:8050
 ```
 
-The launcher will automatically:
--  **Detect your operating system** (Windows/macOS/Linux)
--  **Scan for connected microcontrollers** (Arduino, ESP32, etc.)
--  **Choose optimal launcher script** (PowerShell/Batch/Shell)
--  **Set up centralized Python cache** (organized `__pycache__`)
--  **Start the dashboard** at `http://localhost:8050`
--  **Use mock data** if no hardware is detected
+### Universal Serial Setup (Works on Windows/Mac/Linux)
 
-**See `GUI/SIMPLE_SETUP.md` for detailed setup guide and advanced options.**
-
-### Alternative: Docker Deployment
-For containerized deployment or isolated environments:
-
+***Start Universal Serial Server with Flags**
 ```bash
-cd GUI/docker
-./start.bat     # Windows
-./start.sh      # macOS/Linux
-```
-
-This will:
-- Build the Docker container
-- Install all dependencies
-- Start the dashboard at `http://localhost:8050`
-
-**See `GUI/docker/README.md` for detailed Docker setup guide.**
-
-### Legacy: Manual Python Setup
-```bash
+# Auto-detect and connect to Arduino/microcontroller
 cd GUI
-python -m venv venv
-venv\Scripts\activate  # Windows
-source venv/bin/activate  # macOS/Linux
-pip install -r requirements.txt
-python src/app.py
+python src/services/serial_server.py --auto-detect
+
+# Interactive selection from detected devices
+python src/services/serial_server.py --interactive
+
+# Manual port specification (if needed)
+python src/services/serial_server.py --port YOUR_PORT --baudrate 115200
 ```
+
+**Step 2: Start Docker GUI**
+```bash
+cd docker
+# From docker directory
+docker-compose up --build
+# Access at: http://localhost:8050
+```
+## Docker Setup with Serial Port Access
+
+Since Docker containers cannot directly access host serial ports, we use a **serial server bridge** architecture for hardware connectivity:
+
+```
+Host System (Windows/Mac/Linux)
+├── Serial Port (Arduino/Microcontroller)
+├── Serial Server (Python) ── TCP Port 9999
+└── Docker Container (GUI) ── Connects to TCP Port 9999
+```
+
+### Auto-Detection Features
+
+The serial server automatically detects microcontrollers with confidence scoring:
+
+- **HIGH Confidence**: Arduino Uno, ESP32, ESP8266 with proper VID/PID
+- **MEDIUM Confidence**: CH340, CP210x, FTDI USB-to-serial adapters  
+- **LOW Confidence**: Generic serial devices and USB converters
+
+**Universal Port Detection:**
+- **Windows**: COM3, COM4, COM5, COM6, etc.
+- **macOS**: `/dev/tty.usbmodem*`, `/dev/tty.usbserial*`
+- **Linux**: `/dev/ttyUSB0`, `/dev/ttyACM0`, etc.
+
+**No platform-specific scripts needed** - PySerial handles all OS differences automatically!
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SERIAL_SERVER_MODE` | Enable TCP serial server mode | `true` |
+| `SERIAL_SERVER_HOST` | Serial server hostname | `127.0.0.1` |
+| `SERIAL_SERVER_PORT` | Serial server TCP port | `9999` |
+| `DASH_HOST` | GUI host binding | `0.0.0.0` |
+| `DASH_PORT` | GUI port | `8050` |
+| `DASH_DEBUG` | Enable debug mode | `false` |
+
+### Supported Devices
+
+The system automatically detects:
+- Arduino Uno, Nano, Mega
+- ESP32, ESP8266
+- CH340, CP210x, FTDI USB-to-serial chips
+- Generic COM/USB serial devices
 
 ## Project Structure
 
@@ -65,16 +100,31 @@ The repository has been reorganized into a clean, scalable structure with four m
 
 ###  `GUI/` - Active User Interface
 **Current Dash-based web application for sensor monitoring and control**
+
+```
+GUI/
+├── src/                          # Main application code
+│   ├── app.py                   # Application entry point
+│   ├── core/                    # Core application logic
+│   ├── services/                # Communication & data services
+│   │   └── serial_server.py     # Universal serial server with auto-detection
+│   ├── ui/                      # User interface components
+│   └── utils/                   # Utility functions
+├── config/                      # Configuration files
+├── docker/                      # Docker configuration
+└── requirements.txt             # Python dependencies
+```
+
 - **Technology**: Python Dash with Bootstrap components
 - **Purpose**: Real-time sensor dashboard with modular architecture
 - **Key Features**:
-  - Dynamic tab management
-  - Real-time sensor data visualization
-  - Modular sensor cards
-  - Emergency controls
-  - **Intelligent launcher system** (`run.py`) with automatic hardware detection
-  - **Centralized configuration** (`config/` directory)
-- **Setup**: See `GUI/SIMPLE_SETUP.md` for quick start guide
+  - Real-time sensor monitoring with live data visualization
+  - Cross-platform support (Windows, macOS, Linux)
+  - Docker deployment with containerized setup
+  - Hardware detection with automatic Arduino/microcontroller discovery
+  - Modular architecture for easy sensor extension
+  - Web interface with modern, responsive dashboard
+  - Serial communication with robust port handling
 - **Status**: Active development
 
 ### `documentation/` - Project Documentation
@@ -125,24 +175,103 @@ The repository has been reorganized into a clean, scalable structure with four m
 
 **Current Active Stack:**
 - **Frontend**: Python Dash, Dash Bootstrap Components, Plotly
-- **Communication**: PySerial with intelligent mock/hardware detection
+- **Communication**: TCP-based serial server bridge (no mock modes, no abstractions)
+  - Serial Server: PySerial + TCP server on host machine (port 9999)
+  - GUI Client: Direct TCP client connection from Docker/local
+  - Protocol: JSON over TCP for sensor discovery and data streaming
 - **Data Processing**: Pandas, NumPy
-- **Deployment**: Intelligent launcher system + Docker (alternative)
-- **Configuration**: Centralized config system with automatic path resolution
-- **Development**: Cross-platform launcher scripts (PowerShell/Batch/Shell)
+- **Deployment**: Docker with serial server bridge architecture
+- **Configuration**: Centralized config system with environment variables
+- **Development**: Clean, single-backend architecture for easy debugging
+
+**Architecture Philosophy:**
+- **No Mock Modes**: Always use real TCP connection to serial server
+- **No Abstractions**: Single `CommunicationService` class, no wrapper layers
+- **Docker-First**: Designed for containerized deployment
+- **Clean & Debuggable**: Simple code flow from Arduino → Serial Server → TCP → GUI → Graph
 
 **Legacy Stack (Preserved):**
 - **Previous GUI**: PyQt5, PyQtGraph
 - **Web Interface**: React, JavaScript
 - **Embedded**: Arduino, C/C++
 
+## Development
+
+### Local Development Setup
+
+```bash
+# Clone and navigate
+cd GUI
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # macOS/Linux
+# or
+venv\Scripts\activate     # Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run application
+python -m src.app --debug
+```
+
+### Development with Hardware
+
+```bash
+# Terminal 1: Start universal serial server
+python src/services/serial_server.py --auto-detect
+# or for interactive selection:
+python src/services/serial_server.py --interactive
+
+# Terminal 2: Run GUI locally
+SERIAL_SERVER_MODE=true SERIAL_SERVER_HOST=localhost python -m src.app
+```
+
+## Troubleshooting
+
+### GUI Shows "No Hardware" Despite Connected Device
+
+1. **Check Serial Server**: Look for "Successfully connected to PORT" message
+2. **Verify Port**: Ensure no other software is using the serial port
+3. **Docker Network**: Test `curl http://host.docker.internal:9999` from container
+4. **Permissions**: Check port permissions and driver installation
+
+### Serial Server Issues
+
+1. **Install PySerial**: `pip install pyserial`
+2. **Check Available Ports**: 
+   ```python
+   python -c "import serial.tools.list_ports; [print(f'{p.device} - {p.description}') for p in serial.tools.list_ports.comports()]"
+   ```
+3. **Port In Use**: Close Arduino IDE, PuTTY, or other serial monitors
+
+### Docker Connection Issues
+
+1. **Windows**: Ensure using `host.docker.internal`
+2. **Firewall**: Allow Python through firewall for port 9999
+3. **Network Mode**: Try `network_mode: "host"` in compose file
+
+## Common Device Settings
+
+| Device | Typical Port | Baud Rate |
+|--------|--------------|-----------|
+| Arduino Uno | COM3-COM6 (Win) / /dev/ttyACM0 (Linux) | 115200 |
+| ESP32 | COM4-COM8 (Win) / /dev/ttyUSB0 (Linux) | 115200 |
+| Arduino Nano | COM3-COM6 (Win) / /dev/ttyUSB0 (Linux) | 57600 |
+| Generic Serial | Various | 9600 |
+
 ## Getting Help
 
-1. **Quick Setup**: See `GUI/SIMPLE_SETUP.md` for one-command setup and troubleshooting
-2. **Current Development**: Check `GUI/README.md` for detailed development guides
-3. **Architecture Questions**: Review `documentation/` for system diagrams and specs
-4. **Legacy Reference**: Browse `depreciated/` for historical implementations
-5. **Team Communication**: Contact team leads for project-specific questions
+### Setup Issues
+1. **Import Errors**: Check Python environment and dependencies
+2. **Serial Issues**: Verify pyserial installation and port permissions
+3. **Docker Issues**: Check container logs and network connectivity
+
+### Development
+1. **Architecture Questions**: Review `documentation/` for system diagrams and specs
+2. **Legacy Reference**: Browse `depreciated/` for historical implementations
+3. **Team Communication**: Contact team leads for project-specific questions
 
 ## Contributing
 
@@ -150,6 +279,33 @@ The repository has been reorganized into a clean, scalable structure with four m
 2. **Documentation**: Update `documentation/` for any architectural changes
 3. **Testing**: Add tests for new functionality
 4. **Legacy Code**: Do not modify code in `depreciated/` or `archived_resources/`
+
+## Docker Deployment Notes
+
+The GUI has been optimized for Docker deployment with the following changes:
+
+**Key Docker Changes:**
+1. **Single Entry Point**: Only `src/app.py` is used (no complex launchers in Docker)
+2. **TCP-Only Communication**: Direct TCP connection to serial server (no mock mode)
+3. **Docker-First**: Optimized for containerized deployment
+4. **Simplified Configuration**: Environment variable driven
+5. **No OS Detection**: Works on any platform via Docker
+
+**Clean Architecture (October 2025):**
+- **Removed**: communication_service.py wrapper (unnecessary abstraction)
+- **Removed**: Mock communication modes (use real serial server only)
+- **Removed**: BaseCommunication abstract class (single implementation)
+- **Result**: One class (`CommunicationService`), one backend (TCP), easy to debug
+
+**Removed Files (Docker Cleanup):**
+- `run.py` - Complex intelligent launcher (replaced by Docker entry point)
+- `config/launcher.py` - Python launcher
+- `config/run.ps1` - PowerShell launcher
+- `config/run.bat` - Batch launcher
+- `config/run.sh` - Shell launcher script
+- `serial_server.log` - Old log file
+- `services/communication_service.py` - Wrapper abstraction (deprecated)
+- `**/__pycache__/` - Python bytecode cache directories
 
 ## Migration Notes
 
@@ -159,8 +315,8 @@ This repository was restructured in October 2025 to improve maintainability and 
 - **Preserved Legacy**: Old implementations moved to depreciated/ for reference
 - **Organized Documentation**: Centralized in documentation/ folder
 - **Archived Resources**: Historical web interfaces preserved in archived_resources/
-- **Simplified Setup**: Added intelligent launcher system (`run.py`) for one-command setup
-- **Centralized Config**: Moved configuration files to `config/` directory with automatic path resolution
+- **Docker Optimization**: Simplified entry point system for containerized deployment
+- **Centralized Config**: Essential configuration files in `config/` directory
 
 For questions about the restructuring or location of specific files, please contact the electrical team leads.
 

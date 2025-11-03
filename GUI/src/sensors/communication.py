@@ -6,9 +6,7 @@ import serial
 import sys
 from pathlib import Path
 
-# Add GUI directory to path for config package imports
-gui_dir = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(gui_dir))
+# Use PYTHONPATH for imports
 from config.log_config import get_logger
 
 logger = get_logger(__name__)
@@ -22,6 +20,11 @@ class CommunicationInterface(ABC):
 
     def deregister_callback(self, sensor_id):
         self.callbacks.pop(sensor_id, None)
+    
+    @abstractmethod
+    def query_sensors(self):
+        """Query for available sensors."""
+        pass
 
     @abstractmethod
     def close(self):
@@ -37,18 +40,13 @@ class PySerialCommunication(CommunicationInterface):
         self.serial_conn = None
         self.running = True
         self.serial_lock = threading.Lock()
+        self.discovered_sensors = {}  # {sensor_name: {'pins': [], 'last_seen': timestamp}}
+        self.sensor_discovery_callback = None  # Callback when new sensor discovered
         self.thread = threading.Thread(target=self.read_loop, name="SerialReadThread")
         self.thread.daemon = True
         self.thread.start()
 
     def connect(self):
-        # Check if this is a mock port (no real hardware)
-        if self.port == 'loop://' or self.port.startswith('mock'):
-            logger.info(f"[MOCK MODE] Using mock communication - no hardware connection needed")
-            logger.info(f"[MOCK MODE] Port configured as: {self.port}")
-            self.serial_conn = None  # No real connection for mock mode
-            return
-        
         retry_count = 0
         max_retries = 3  # Limit retries to avoid endless loops
         
@@ -70,9 +68,8 @@ class PySerialCommunication(CommunicationInterface):
                     logger.info(f"Retrying in {self.reconnect_interval} seconds... ({retry_count}/{max_retries})")
                     time.sleep(self.reconnect_interval)
                 else:
-                    logger.error(f"[ERROR] Failed to connect after {max_retries} attempts. Switching to mock mode.")
-                    logger.info(f"[MOCK MODE] No microcontroller detected - using simulated data")
-                    self.port = 'mock://fallback'  # Mark as mock mode
+                    logger.error(f"[ERROR] Failed to connect after {max_retries} attempts.")
+                    logger.error(f"[ERROR] No microcontroller detected on port {self.port}")
                     self.serial_conn = None
                     break
             except Exception as e:
@@ -82,22 +79,13 @@ class PySerialCommunication(CommunicationInterface):
                     logger.info(f"Retrying in {self.reconnect_interval} seconds... ({retry_count}/{max_retries})")
                     time.sleep(self.reconnect_interval)
                 else:
-                    logger.error(f"[ERROR] Failed to connect after {max_retries} attempts. Switching to mock mode.")
-                    logger.info(f"[MOCK MODE] Hardware connection failed - using simulated data")
-                    self.port = 'mock://fallback'  # Mark as mock mode
+                    logger.error(f"[ERROR] Failed to connect after {max_retries} attempts.")
+                    logger.error(f"[ERROR] Hardware connection failed on port {self.port}")
                     self.serial_conn = None
                     break
 
     def read_loop(self):
         self.connect()
-        
-        # If we're in mock mode, don't try to read from serial
-        if self.port.startswith('mock') or self.port == 'loop://':
-            logger.info("[MOCK MODE] Mock communication active - no serial reading needed")
-            logger.info("[MOCK MODE] Real sensor data will be provided by MockCommunication service")
-            while self.running:
-                time.sleep(1)  # Just sleep in mock mode
-            return
         
         while self.running:
             if self.serial_conn and self.serial_conn.is_open:
@@ -106,10 +94,17 @@ class PySerialCommunication(CommunicationInterface):
                         line = self.serial_conn.readline().decode('utf-8').strip()
                     if line:
                         logger.debug(f"Received line: {line}")
-                        sensor_id, data_str = self.parse_message(line)
-                        if sensor_id and sensor_id in self.callbacks:
-                            data_values = data_str.split(',')
-                            self.callbacks[sensor_id](data_values)
+                        
+                        # Check if this is a header message
+                        if line.startswith('*H*_'):
+                            self.parse_header(line)
+                        else:
+                            # Regular sensor data message
+                            sensor_id, data_str = self.parse_message(line)
+                            if sensor_id and sensor_id in self.callbacks:
+                                data_values = data_str.split(',')
+                                self.callbacks[sensor_id](data_values)
+                                
                 except serial.SerialException as e:
                     logger.warning(f"SerialException occurred: {e}")
                     logger.info("Closing connection and attempting to reconnect...")
@@ -132,10 +127,9 @@ class PySerialCommunication(CommunicationInterface):
                             self.serial_conn = None
                     self.connect()
             else:
-                if not self.port.startswith('mock'):
-                    logger.debug("Serial connection is not open. Attempting to reconnect...")
-                    self.connect()
-            time.sleep(0.1)  # Small delay to prevent a tight loop
+                logger.debug("Serial connection is not open. Attempting to reconnect...")
+                self.connect()
+            time.sleep(0.01)  # Small delay for high-frequency updates
 
     def parse_message(self, message):
         parts = message.split(':', 1)
@@ -143,6 +137,67 @@ class PySerialCommunication(CommunicationInterface):
             return parts[0].strip(), parts[1].strip()
         else:
             return None, None
+    
+    def parse_header(self, header_line):
+        """Parse header format: *H*_sensorName_pinList_payload
+        
+        Example: *H*_accelerometer_A0,D3,D4_speed:5km/h
+        """
+        try:
+            # Remove *H*_ prefix
+            if not header_line.startswith('*H*_'):
+                return
+            
+            content = header_line[4:]  # Remove '*H*_'
+            parts = content.split('_', 2)  # Split into max 3 parts
+            
+            if len(parts) < 3:
+                logger.warning(f"Invalid header format: {header_line}")
+                return
+            
+            sensor_name = parts[0]
+            pin_list = parts[1].split(',') if parts[1] else []
+            payload = parts[2] if len(parts) > 2 else ""
+            
+            # Update discovered sensors
+            if sensor_name not in self.discovered_sensors:
+                logger.info(f"New sensor discovered: {sensor_name} on pins {pin_list}")
+                self.discovered_sensors[sensor_name] = {
+                    'pins': pin_list,
+                    'last_seen': time.time(),
+                    'payload': payload
+                }
+                # Notify discovery callback
+                if self.sensor_discovery_callback:
+                    self.sensor_discovery_callback(sensor_name, pin_list, payload)
+            else:
+                # Update last seen timestamp
+                self.discovered_sensors[sensor_name]['last_seen'] = time.time()
+                self.discovered_sensors[sensor_name]['payload'] = payload
+            
+            # Also trigger regular data callback if registered
+            if sensor_name in self.callbacks:
+                # Parse payload as data
+                data_values = [payload]
+                self.callbacks[sensor_name](data_values)
+                
+        except Exception as e:
+            logger.error(f"Error parsing header '{header_line}': {e}")
+    
+    def set_discovery_callback(self, callback):
+        """Set callback to be called when new sensor is discovered.
+        
+        Callback signature: callback(sensor_name: str, pins: list, payload: str)
+        """
+        self.sensor_discovery_callback = callback
+    
+    def get_discovered_sensors(self):
+        """Get list of discovered sensor names."""
+        return list(self.discovered_sensors.keys())
+    
+    def query_sensors(self):
+        """Return currently discovered sensors (passive discovery)."""
+        return self.get_discovered_sensors()
 
     def close(self):
         self.running = False
@@ -152,8 +207,7 @@ class PySerialCommunication(CommunicationInterface):
                 logger.info("Serial connection closed successfully")
             except Exception as e:
                 logger.error(f"Error closing serial connection: {e}")
-        elif self.port.startswith('mock') or self.port == 'loop://':
-            logger.info("[MOCK MODE] Mock communication closed - no hardware to disconnect")
+
         else:
             logger.info("No active serial connection to close")
 
@@ -186,6 +240,11 @@ class ZCMCommunication(CommunicationInterface):
         # For example, if message is a string of comma-separated values:
         data_str = message.decode('utf-8').strip()
         return data_str.split(',')
+    
+    def query_sensors(self):
+        """Query for available sensors (not implemented for ZCM)."""
+        logger.warning("Sensor query not implemented for ZCM communication")
+        return []
 
     def close(self):
         if self.zcm_conn:

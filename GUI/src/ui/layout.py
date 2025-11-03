@@ -1,22 +1,29 @@
 """Main application layout."""
 from dash import html, dcc
 import dash_bootstrap_components as dbc
-from typing import Optional, List
+from typing import Optional, List, Dict
 
-from ui.components.common import NavigationBar, TabContainer, CallbackStore
+from ui.components.common import NavigationBar, Sidebar, CallbackStore
 from ui.pages.sensor_page import SensorDashboardPage
 from ui.pages.profile_page import ProfilePage
 from core.dependencies import container
 from services.sensor_service import SensorService
 from services.profile_service import ProfileService
-import sys
-from pathlib import Path
-# Add GUI directory to path for config package imports
-gui_dir = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(gui_dir))
+from sensors.sensor_registry import sensor_registry
 from config.log_config import get_logger
 
 logger = get_logger(__name__)
+
+# Content area styling to account for sidebar and fixed navbar
+CONTENT_STYLE = {
+    "marginLeft": "18rem",
+    "marginRight": "2rem",
+    "paddingTop": "56px",  # Account for fixed navbar height
+    "padding": "56px 1rem 2rem 1rem",  # Top, right, bottom, left
+    "minHeight": "100vh",  # Full viewport height
+    "overflowY": "auto",  # Allow vertical scrolling
+    "position": "relative"
+}
 
 
 class MainLayout:
@@ -24,74 +31,74 @@ class MainLayout:
     
     def __init__(self):
         self.navbar = NavigationBar()
-        self.tab_container = TabContainer()
+        self.sidebar = Sidebar()
+        self.pages: Dict[str, any] = {}
         self._setup_pages()
     
     def _setup_pages(self) -> None:
-        """Setup application pages."""
+        """Setup application pages and navigation."""
         try:
-            # Get sensor service and create sensor page
-            sensor_service = container.get(SensorService)
-            sensor_names = sensor_service.get_sensor_names()
+            # Get sensor names from registry instead of sensor service
+            sensor_names = sensor_registry.get_all_sensor_names()
             sensor_page = SensorDashboardPage(sensor_names)
             
-            # Add tabs
-            self.tab_container.add_tab(
-                'sensors',
-                'Sensors',
-                sensor_page.create_layout()
-            )
+            # Add sensor page
+            self.pages['sensors'] = sensor_page.create_layout()
+            self.sidebar.add_nav_item('sensors', 'Sensor Dashboard', 'fas fa-tachometer-alt')
             
-            # Add profile page
+            # Add navigation items for future features (will be implemented as overlays or pages later)
+            # These are placeholders in the navigation
+            self.sidebar.add_nav_item('driving', 'Driving View', 'fas fa-car')
+            self.sidebar.add_nav_item('brakes', 'Brake Control', 'fas fa-stop-circle')
+            self.sidebar.add_nav_item('emergency', 'Emergency Stop', 'fas fa-exclamation-triangle', is_critical=True)
+            self.sidebar.add_nav_item('safety', 'Safety Verification', 'fas fa-shield-alt')
+
+            # Add profile page for VFD operational modes
             profile_page = ProfilePage()
-            self.tab_container.add_tab(
-                'profiles',
-                'Profiles',
-                profile_page.create_layout()
-            )
+            self.pages['profiles'] = profile_page.create_layout()
+            self.sidebar.add_nav_item('profiles', 'VFD Profiles', 'fas fa-rocket')
+            
+            # Set default page
+            self.default_page = 'sensors'
             
             logger.info("Pages setup completed")
             
         except Exception as e:
             logger.error(f"Failed to setup pages: {e}")
             # Create minimal fallback layout
-            self.tab_container.add_tab(
-                'error',
-                'Error',
-                html.Div([
-                    html.H3("Application Error"),
-                    html.P(f"Failed to initialize application: {e}")
-                ])
-            )
+            self.pages['error'] = html.Div([
+                html.H3("Application Error"),
+                html.P(f"Failed to initialize application: {e}")
+            ])
+            self.default_page = 'error'
     
     def create_layout(self) -> html.Div:
         """Create the main application layout."""
         try:
-            # Create tabs
-            tabs = self.tab_container.create_tabs()
-            default_tab = self.tab_container.get_default_tab()
-            
             return html.Div([
                 # Callback store for session data
                 CallbackStore.create(),
                 
-                # Main card container
-                dbc.Card([
-                    # Navigation bar
-                    self.navbar.create(),
-                    
-                    # Tab container
-                    dbc.Container([
-                        dcc.Tabs(
-                            id='main-tabs',
-                            value=default_tab,
-                            children=tabs
-                        ),
-                        html.Div(id='main-tabs-content')
-                    ], fluid=True)
-                    
-                ], body=True, className="mt-3")
-            ])
+                # Location component for URL routing
+                dcc.Location(id='url', refresh=False),
+                
+                # Navigation bar (fixed at top)
+                self.navbar.create(),
+                
+                # Sidebar navigation
+                self.sidebar.create(),
+                
+                # Main content area
+                html.Div(
+                    id='page-content',
+                    style=CONTENT_STYLE
+                )
+            ], style={
+                "margin": "0",
+                "padding": "0",
+                "overflowX": "hidden",
+                "scrollBehavior": "smooth"
+            })
             
         except Exception as e:
             logger.error(f"Failed to create layout: {e}")
@@ -106,18 +113,23 @@ class MainLayout:
             from ui.callbacks.main_callbacks import MainCallbacks
             from ui.callbacks.sensor_callbacks import SensorCallbacks
             from ui.callbacks.profile_callbacks import ProfileCallbacks
+            from ui.callbacks.navigation_callbacks import NavigationBarCallbacks
             
-            # Register main callbacks
-            main_callbacks = MainCallbacks(self.tab_container)
+            # Register main callbacks with pages
+            main_callbacks = MainCallbacks(self.pages, self.default_page)
             main_callbacks.register(app)
             
             # Register sensor callbacks
             sensor_callbacks = SensorCallbacks()
             sensor_callbacks.register(app)
             
-            # Register profile callbacks
+            # Register VFD profile callbacks
             profile_callbacks = ProfileCallbacks()
             profile_callbacks.register(app)
+            
+            # Register navigation bar callbacks
+            nav_callbacks = NavigationBarCallbacks()
+            nav_callbacks.register_callbacks(app)
             
             logger.info("Callbacks registered successfully")
             
@@ -131,11 +143,11 @@ class MainLayout:
         from dash.dependencies import Input, Output
         
         @app.callback(
-            Output('main-tabs-content', 'children'),
-            [Input('main-tabs', 'value')]
+            Output('page-content', 'children'),
+            [Input('url', 'pathname')]
         )
-        def render_tab_content(tab_value):
+        def render_page_content(pathname):
             return html.Div([
-                html.H3("Tab Error"),
-                html.P(f"Unable to load content for tab: {tab_value}")
+                html.H3("Page Error"),
+                html.P(f"Unable to load content for page: {pathname}")
             ])

@@ -7,9 +7,9 @@ from config.settings import AppConfig, load_config
 from config.log_config import setup_logging, get_logger
 from core.dependencies import container
 from core.exceptions import HyperloopGUIError, CommunicationError
-from services.communication_service import CommunicationService
+from services.tcp_communication_service import CommunicationService
 from services.sensor_service import SensorService
-from services.profile_service import ProfileService
+# from services.profile_service import ProfileService
 from ui.layout import MainLayout
 
 logger = get_logger(__name__)
@@ -44,6 +44,8 @@ class HyperloopGUIApplication:
             sensor_service = SensorService(communication_service)
             container.register(SensorService, sensor_service)
             
+            # Import and register ProfileService for VFD operational modes
+            from services.profile_service import ProfileService
             profile_service = ProfileService(communication_service)
             container.register(ProfileService, profile_service)
             
@@ -59,11 +61,18 @@ class HyperloopGUIApplication:
             return self._app
         
         try:
+            # Include Font Awesome for icons
+            external_stylesheets = [
+                dbc.themes.BOOTSTRAP,
+                "https://use.fontawesome.com/releases/v5.15.4/css/all.css"
+            ]
+            
             self._app = Dash(
                 __name__,
-                external_stylesheets=[dbc.themes.BOOTSTRAP],
+                external_stylesheets=external_stylesheets,
                 suppress_callback_exceptions=self.config.suppress_callback_exceptions,
-                title=self.config.title
+                title=self.config.title,
+                assets_folder='assets'
             )
             
             # Setup layout

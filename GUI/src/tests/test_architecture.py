@@ -4,13 +4,8 @@
 import sys
 import os
 
-# Add current directory and GUI directory to path for config package imports
+# Use PYTHONPATH for imports
 from pathlib import Path
-current_file = Path(__file__).resolve()
-src_dir = current_file.parent
-gui_dir = src_dir.parent
-sys.path.insert(0, str(src_dir))
-sys.path.insert(0, str(gui_dir))
 
 def test_imports():
     """Test all major imports."""
@@ -24,7 +19,7 @@ def test_imports():
         from core.application import HyperloopGUIApplication
         print('✓ Application module imported successfully')
         
-        from services.communication_service import CommunicationService
+        from services.tcp_communication_service import CommunicationService
         print('✓ Communication service imported successfully')
         
         from services.sensor_service import SensorService
