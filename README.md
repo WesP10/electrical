@@ -15,38 +15,27 @@ This repository contains the electrical team's code, documentation, and resource
 
 ## Quick Start
 
-### Option 1: Docker (Recommended)
 **Simple setup with containerized deployment:**
 
-```bash
-# Start Docker GUI (sensors will show "No Hardware" without serial server)
-cd GUI
-docker-compose -f docker/docker-compose.yml up --build
-# Access at: http://localhost:8050
-```
+1. **Optional: Connect to Hardware** (Skip if not using a microcontroller)
+   ```bash
+   # Auto-detect and connect to Arduino/microcontroller
+   cd GUI
+   python src/services/serial_server.py --auto-detect
 
-### Universal Serial Setup (Works on Windows/Mac/Linux)
+   # Alternative: Interactive selection from detected devices
+   python src/services/serial_server.py --interactive
 
-***Start Universal Serial Server with Flags**
-```bash
-# Auto-detect and connect to Arduino/microcontroller
-cd GUI
-python src/services/serial_server.py --auto-detect
+   # Manual port specification (if needed)
+   python src/services/serial_server.py --port YOUR_PORT --baudrate 115200
+   ```
 
-# Interactive selection from detected devices
-python src/services/serial_server.py --interactive
-
-# Manual port specification (if needed)
-python src/services/serial_server.py --port YOUR_PORT --baudrate 115200
-```
-
-**Step 2: Start Docker GUI**
-```bash
-cd docker
-# From docker directory
-docker-compose up --build
-# Access at: http://localhost:8050
-```
+2. **Start Docker GUI**
+   ```bash
+   cd GUI
+   docker-compose -f docker/docker-compose.yml up --build
+   # Access at: http://localhost:8050
+   ```
 ## Docker Setup with Serial Port Access
 
 Since Docker containers cannot directly access host serial ports, we use a **serial server bridge** architecture for hardware connectivity:
