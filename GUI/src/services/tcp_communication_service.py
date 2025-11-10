@@ -24,12 +24,15 @@ logger = get_logger(__name__)
 
 class CommunicationService:
     """
-    TCP-based communication client that requests data from the serial server.
-    Uses request-response pattern instead of passive broadcasts.
+    TCP-based communication client that receives data from the serial server.
+    Uses passive push pattern - server sends periodic updates every 500ms.
     This allows GUI hot reload without COM port conflicts.
+    
+    The client simply listens for periodic updates from the server rather than
+    actively polling, which eliminates timeout warnings and simplifies the architecture.
     """
     
-    def __init__(self, config=None, server_host=None, server_port=None, reconnect_delay=2.0, poll_interval=0.5):
+    def __init__(self, config=None, server_host=None, server_port=None, reconnect_delay=2.0):
         """
         Initialize the communication service.
         
@@ -38,17 +41,13 @@ class CommunicationService:
             server_host: Override server host (defaults to env SERIAL_SERVER_HOST)
             server_port: Override server port (defaults to env SERIAL_SERVER_PORT)
             reconnect_delay: Delay between reconnection attempts
-            poll_interval: How often to request data
         """
         self.config = config
         
         # Get configuration from environment or parameters
         self.server_host = server_host or os.environ.get('SERIAL_SERVER_HOST', 'localhost')
-        # Get configuration from environment or parameters
-        self.server_host = server_host or os.environ.get('SERIAL_SERVER_HOST', 'localhost')
         self.server_port = server_port or int(os.environ.get('SERIAL_SERVER_PORT', '9999'))
         self.reconnect_delay = reconnect_delay
-        self.poll_interval = poll_interval  # How often to request data
         
         # Callbacks
         self.sensor_discovery_callback = None
@@ -57,14 +56,7 @@ class CommunicationService:
         self.socket = None
         self.running = False
         self.client_thread = None
-        self.request_thread = None
-        self.reconnect_delay = reconnect_delay
-        self.poll_interval = poll_interval  # How often to request data
-        
-        self.socket = None
-        self.running = False
-        self.client_thread = None
-        self.request_thread = None
+        self.keepalive_thread = None
         
         # Request tracking
         self.request_id_counter = 0
@@ -73,8 +65,12 @@ class CommunicationService:
         
         # Data storage
         self.discovered_sensors = {}  # {sensor_name: {'pins': [], 'last_seen': timestamp}}
-        self.connection_status = {'connected': False, 'error': None}
-        self.last_data_request = 0  # Timestamp of last data request
+        self.connection_status = {
+            'connected': False, 
+            'error': None,
+            'serial_port': None,
+            'serial_connected': False
+        }
         
         # Sensor data buffer (stores recent readings for each sensor)
         self.sensor_data_buffer = {}  # {sensor_name: [(timestamp, values), ...]}
@@ -87,7 +83,7 @@ class CommunicationService:
         self.console_lock = threading.Lock()
         
         logger.info(f"TCP Communication initialized to connect to {self.server_host}:{self.server_port}")
-        logger.info(f"Data polling interval: {self.poll_interval}s")
+        logger.info(f"Server pushes periodic updates every 500ms automatically")
         
         # Auto-start the service
         self.start()
@@ -127,22 +123,22 @@ class CommunicationService:
             logger.debug(f"Deregistered legacy callback for sensor: {sensor_id}")
     
     def start(self):
-        """Start the TCP client and data requesting threads."""
+        """Start the TCP client and keepalive threads."""
         if self.running:
             logger.warning("TCP client already running")
             return
         
         self.running = True
         
-        # Start client thread for receiving responses
+        # Start client thread for receiving periodic updates from server
         self.client_thread = threading.Thread(target=self._client_loop, name="TCPClientThread", daemon=True)
         self.client_thread.start()
         
-        # Start data request thread for active polling
-        self.request_thread = threading.Thread(target=self._request_loop, name="TCPRequestThread", daemon=True)
-        self.request_thread.start()
+        # Start keepalive thread for connection monitoring
+        self.keepalive_thread = threading.Thread(target=self._request_loop, name="TCPKeepaliveThread", daemon=True)
+        self.keepalive_thread.start()
         
-        logger.info("Active TCP client threads started")
+        logger.info("TCP client threads started (passive mode - server pushes updates)")
     
     def stop(self):
         """Stop the TCP client threads."""
@@ -151,7 +147,7 @@ class CommunicationService:
         # Clear pending requests
         with self.request_lock:
             for event in self.pending_requests.values():
-                event.set()  # Unblock waiting threads
+                event['event'].set()  # Unblock waiting threads
             self.pending_requests.clear()
         
         if self.socket:
@@ -162,10 +158,10 @@ class CommunicationService:
         
         if self.client_thread:
             self.client_thread.join(timeout=2.0)
-        if self.request_thread:
-            self.request_thread.join(timeout=2.0)
+        if self.keepalive_thread:
+            self.keepalive_thread.join(timeout=2.0)
             
-        logger.info("Active TCP client threads stopped")
+        logger.info("TCP client threads stopped")
     
     def close(self):
         """Close the TCP client connection."""
@@ -254,26 +250,24 @@ class CommunicationService:
         logger.info("TCP client response loop stopped")
     
     def _request_loop(self):
-        """Active loop that periodically requests data from server."""
-        logger.info("TCP data request loop started")
+        """Passive loop that keeps connection alive (server pushes periodic updates)."""
+        logger.info("TCP connection keepalive loop started")
         
         while self.running:
             try:
-                if self.socket and self.connection_status['connected']:
-                    # Request data from the last poll interval
-                    current_time = time.time()
-                    from_time = max(self.last_data_request, current_time - self.poll_interval * 1.5)  # Small overlap
-                    
-                    self._request_data(from_time, current_time)
-                    self.last_data_request = current_time
+                # Server sends periodic updates automatically every 500ms
+                # This loop just keeps the connection alive and handles any connection issues
+                if not self.socket or not self.connection_status['connected']:
+                    logger.debug("Waiting for connection to be established...")
                 
-                time.sleep(self.poll_interval)
+                # Sleep to prevent busy waiting
+                time.sleep(2.0)  # Check connection status every 2 seconds
                 
             except Exception as e:
-                logger.error(f"Error in request loop: {e}")
-                time.sleep(self.poll_interval)
+                logger.error(f"Error in keepalive loop: {e}")
+                time.sleep(2.0)
         
-        logger.info("TCP data request loop stopped")
+        logger.info("TCP connection keepalive loop stopped")
     
     def _disconnect(self):
         """Handle disconnection from server."""
@@ -331,27 +325,27 @@ class CommunicationService:
                     del self.pending_requests[request_id]
             return None
     
-    def _request_data(self, from_time, to_time):
-        """Request data from server within time range (or just send heartbeat with periodic updates)."""
-        # With periodic updates, we primarily rely on server pushing data
-        # But we can still support explicit requests when needed
+    def request_status(self):
+        """
+        Request current server status (optional, used for diagnostics).
+        Server automatically pushes periodic updates, so this is only needed for explicit status checks.
+        """
         request = {
-            'type': 'get_data',
-            'from_time': from_time,
-            'to_time': to_time,
-            'data_types': ['discovery', 'sensor_data']
+            'type': 'get_status'
         }
         
-        logger.debug(f"📤 Requesting data from {from_time:.2f} to {to_time:.2f}")
+        logger.debug("Requesting server status")
         try:
-            response = self._send_request(request, timeout=1.0)  # Shorter timeout since we have periodic updates
-            if response and response.get('type') == 'data_response':
-                logger.debug(f"📥 Received data response with {len(response.get('data', []))} entries")
-                self._process_data_response(response)
+            response = self._send_request(request, timeout=2.0)
+            if response and response.get('type') == 'status_response':
+                logger.info(f"Server status: {response}")
+                return response
             else:
-                logger.debug(f"No explicit data response (relying on periodic updates)")
+                logger.debug("No status response received")
+                return None
         except Exception as e:
-            logger.debug(f"Request failed, relying on periodic updates: {e}")
+            logger.debug(f"Status request failed: {e}")
+            return None
     
     def _process_server_response(self, message):
         """Process a response received from the serial server."""
@@ -486,14 +480,19 @@ class CommunicationService:
             logger.error(f"Error handling sensor data: {e}")
     
     def _handle_server_status(self, message):
-        """Handle server status message."""
+        """Handle server status message and cache connection info."""
         try:
-            serial_connected = message['serial_connected']
-            discovered_sensors = message['discovered_sensors']
-            buffer_size = message['buffer_size']
+            serial_connected = message.get('serial_connected', False)
+            discovered_sensors = message.get('discovered_sensors', [])
+            buffer_size = message.get('buffer_size', 0)
+            serial_port = message.get('serial_port', 'Unknown')
             
             logger.info(f"Server status - Serial: {'Connected' if serial_connected else 'Disconnected'}, "
-                       f"Sensors: {discovered_sensors}, Buffer: {buffer_size}")
+                       f"Port: {serial_port}, Sensors: {discovered_sensors}, Buffer: {buffer_size}")
+            
+            # Cache server connection info
+            self.connection_status['serial_port'] = serial_port
+            self.connection_status['serial_connected'] = serial_connected
             
             # Update our discovered sensors list
             for sensor_name in discovered_sensors:
@@ -641,7 +640,7 @@ class CommunicationService:
                 'port': port,
                 'baud_rate': baud_rate
             }
-            response = self._send_request(request, timeout=10.0)
+            response = self._send_request(request, timeout=15.0)  # Longer timeout for reconfiguration
             
             if response and response.get('type') == 'reconfigure_response':
                 success = response.get('success', False)
@@ -663,22 +662,17 @@ class CommunicationService:
             return False
     
     def get_current_mode(self) -> Dict:
-        """Get current communication mode and settings from the serial server."""
+        """Get current communication mode and settings (from cached state, no blocking requests)."""
         mode_info = {
             'is_mock': False,  # We're always in TCP mode now
-            'connected': self.is_connected_to_server()
+            'connected': self.is_connected_to_server(),
+            'error': self.connection_status.get('error')
         }
         
-        # Try to get additional status from server
+        # Return cached connection status without making blocking requests
+        # The server pushes periodic updates with status info, so we use cached data
         if self.is_connected_to_server():
-            try:
-                request = {'type': 'get_status'}
-                response = self._send_request(request, timeout=2.0)
-                if response and response.get('type') == 'status_response':
-                    mode_info['port'] = response.get('serial_port', 'unknown')
-                    mode_info['baud_rate'] = response.get('baud_rate', 115200)
-                    mode_info['serial_connected'] = response.get('serial_connected', False)
-            except Exception as e:
-                logger.debug(f"Could not get status from server: {e}")
+            mode_info['port'] = self.connection_status.get('serial_port', 'TCP Server')
+            mode_info['serial_connected'] = self.connection_status.get('serial_connected', False)
         
         return mode_info
