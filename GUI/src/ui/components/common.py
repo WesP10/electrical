@@ -144,9 +144,11 @@ class Sidebar:
         })
     
     def create(self) -> html.Div:
-        """Create the sidebar component."""
-        nav_links = []
+        """Create the sidebar component with collapsible finished and unimplemented sections."""
+        finished_links = []
+        unimplemented_links = []
         
+        # Sort items into finished and unimplemented sections
         for item in self.nav_items:
             # Create link content
             link_content = []
@@ -160,20 +162,50 @@ class Sidebar:
             else:
                 className = "nav-link text-dark"
             
-            nav_links.append(
-                dbc.NavLink(
-                    link_content,
-                    href=f"/{item['id']}",
-                    id=f"nav-{item['id']}",
-                    className=className
-                )
+            nav_link = dbc.NavLink(
+                link_content,
+                href=f"/{item['id']}",
+                id=f"nav-{item['id']}",
+                className=className
             )
+            
+            # Sort into appropriate section
+            # Sensor Dashboard and VFD Profiles are finished
+            if item['id'] in ['sensors', 'profiles']:
+                finished_links.append(nav_link)
+            else:
+                unimplemented_links.append(nav_link)
+
+        # Create accordion items
+        accordion_items = [
+            dbc.AccordionItem(
+                dbc.Nav(finished_links, vertical=True, pills=True),
+                title=html.Div([
+                    html.I(className="fas fa-check-circle me-2 text-success"),
+                    "Finished Features"
+                ]),
+                item_id="finished",
+            ),
+            dbc.AccordionItem(
+                dbc.Nav(unimplemented_links, vertical=True, pills=True),
+                title=html.Div([
+                    html.I(className="fas fa-clock me-2 text-warning"),
+                    "In Development"
+                ]),
+                item_id="unimplemented",
+            )
+        ]
         
         return html.Div(
             [
                 html.H4("Navigation", className="mb-3"),
                 html.Hr(),
-                dbc.Nav(nav_links, vertical=True, pills=True)
+                dbc.Accordion(
+                    accordion_items,
+                    start_collapsed=True,
+                    id="sidebar-accordion",
+                    flush=True
+                )
             ],
             style=self.SIDEBAR_STYLE,
             id="sidebar"
